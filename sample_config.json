@@ -1,0 +1,10 @@
+{
+  "client_id": "my_username",
+  "client_secret": "my_password",
+  "refresh_token": "my_refresh_token",
+  "organization_url": "https://my_organization.crm.dynamics.com",
+  "redirect_uri": "https://my_redirect_uri",
+  "api_version": "v9.2",
+  "user_agent": "Tap MS Dynamics 365 CRM",
+  "start_date": "2017-01-01T00:00:00Z"
+}
