@@ -7,7 +7,14 @@ from tap_ms_dynamics_365_crm.sync import sync
 
 LOGGER = singer.get_logger()
 
-REQUIRED_CONFIG_KEYS = ['api_token', 'start_date']
+REQUIRED_CONFIG_KEYS = [
+    'client_id',
+    'client_secret',
+    'organization_uri',
+    'redirect_uri',
+    'refresh_token',
+    'start_date'
+]
 
 def do_discover():
     """
@@ -29,7 +36,7 @@ def main():
     if parsed_args.state:
         state = parsed_args.state
 
-    with Client(parsed_args.config) as client:
+    with Client(parsed_args.config_path, parsed_args.config) as client:
         if parsed_args.discover:
             do_discover()
         elif parsed_args.catalog:

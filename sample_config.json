@@ -1,6 +1,6 @@
 {
-  "client_id": "my_username",
-  "client_secret": "my_password",
+  "client_id": "client_id",
+  "client_secret": "client_secret",
   "refresh_token": "my_refresh_token",
   "organization_url": "https://my_organization.crm.dynamics.com",
   "redirect_uri": "https://my_redirect_uri",
