@@ -16,12 +16,12 @@ REQUIRED_CONFIG_KEYS = [
     'start_date'
 ]
 
-def do_discover():
+def do_discover(client: Client):
     """
     Discover and emit the catalog to stdout
     """
     LOGGER.info("Starting discover")
-    catalog = discover()
+    catalog = discover(client=client)
     json.dump(catalog.to_dict(), sys.stdout, indent=2)
     LOGGER.info("Finished discover")
 
@@ -38,7 +38,7 @@ def main():
 
     with Client(parsed_args.config_path, parsed_args.config) as client:
         if parsed_args.discover:
-            do_discover()
+            do_discover(client=client)
         elif parsed_args.catalog:
             sync(
                 client=client,

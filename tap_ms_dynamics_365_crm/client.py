@@ -6,9 +6,11 @@ import time
 import backoff
 import requests
 from requests import session
+from simplejson import JSONDecodeError
 from requests.exceptions import Timeout, ConnectionError, ChunkedEncodingError
 from singer import get_logger, metrics
 
+from tap_ms_dynamics_365_crm.xml_transformer import transform_metadata_xml
 from tap_ms_dynamics_365_crm.exceptions import ERROR_CODE_EXCEPTION_MAPPING, MSDynamics365CrmError, MSDynamics365CrmBackoffError
 
 LOGGER = get_logger()
@@ -144,7 +146,7 @@ class Client:
 
     def _get_standard_headers(self):
         return {
-            "Authorization": "Bearer {}".format(self.get_access_token),
+            "Authorization": "Bearer {}".format(self.get_access_token()),
             "User-Agent": self.user_agent,
             "OData-MaxVersion": "4.0",
             "OData-Version": "4.0",
@@ -163,7 +165,7 @@ class Client:
     def make_request(
         self,
         method: str,
-        endpoint: str,
+        endpoint: str = None,
         params: Optional[Dict[str, Any]] = None,
         headers: Optional[Dict[str, Any]] = None,
         body: Optional[Dict[str, Any]] = None,
@@ -211,5 +213,9 @@ class Client:
             else:
                 raise ValueError(f"Unsupported method: {method}")
 
-        return response.json()
+        try:
+            results = response.json()
+        except JSONDecodeError:
+            results = response.text
 
+        return results
