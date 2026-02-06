@@ -59,7 +59,6 @@ def call_entity_definitions(client: Client):
 
     LOGGER.info('MS Dynamics returned total {} entities'.format(results.get("@odata.count")))
 
-    # return results
     yield from results.get('value')
 
 def build_entity_metadata(client: Client, included_entities: set):
@@ -102,7 +101,8 @@ def get_streams(client: Client, included_entities: set = None, excluded_entities
         if 'modifiedon' in attributes.keys():
             replication_method = 'INCREMENTAL'
             replication_key = 'modifiedon'
-        else: replication_method = 'FULL_TABLE'
+        else:
+            replication_method = 'FULL_TABLE'
 
         stream_class = REPLICATION_TO_STREAM_MAP.get(replication_method)
         stream_obj = stream_class(client)

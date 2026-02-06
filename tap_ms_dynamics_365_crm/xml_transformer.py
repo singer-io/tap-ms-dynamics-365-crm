@@ -5,7 +5,7 @@ NS = {
     "edm": "http://docs.oasis-open.org/odata/ns/edm"
 }
 
-def flatten_entity_attributes(attributes:list) -> dict:
+def flatten_entity_attributes(attributes: list) -> dict:
     flat_attributes = {}
 
     for attr in attributes:
@@ -16,7 +16,7 @@ def flatten_entity_attributes(attributes:list) -> dict:
 
     return flat_attributes
 
-def transform_metadata_xml(xml:str) -> dict:
+def transform_metadata_xml(xml: str) -> dict:
     tree = ET.fromstring(xml)
 
     data_service = tree.find("edmx:DataServices", NS)

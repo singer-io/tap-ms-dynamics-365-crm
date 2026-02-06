@@ -11,7 +11,7 @@ from tap_ms_dynamics_365_crm.streams.streams import (
     build_schema,
 )
 
-EXCLUDED_ENTITIES = set([
+EXCLUDED_ENTITIES = {
     'MetadataBase',
     'calendarrule',
     'complexcontrol',
@@ -37,10 +37,10 @@ EXCLUDED_ENTITIES = set([
     'lookupmapping',
     'msdyn_casesuggestion',
     'msdyn_knowledgearticlesuggestion'
-])
+}
 
 INCLUDED_ENTITIES = {
-    #sales
+    # Sales Entities List
     'account',
     'contact',
     'lead',
@@ -58,7 +58,7 @@ INCLUDED_ENTITIES = {
     'productpricelevel',
     'salesliterature',
     'salesliteratureitem',
-    # Field Service entities
+    # Field Service Entities List
     'msdyn_actual',
     'msdyn_agreement',
     'msdyn_agreementbookingdate',
@@ -152,7 +152,7 @@ INCLUDED_ENTITIES = {
     'msdyn_workordersubstatus',
     'msdyn_workordertype',
     'msdyn_workhourtemplate',
-    # Customer Service entities
+    # Customer Service entities List
     'incident',
     'incidentresolution',
     'incidentknowledgebaserecord',
