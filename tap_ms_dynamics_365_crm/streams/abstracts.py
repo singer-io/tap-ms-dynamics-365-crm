@@ -11,6 +11,7 @@ from singer import (
     write_schema,
     metadata
 )
+from tap_ms_dynamics_365_crm.client import Client
 
 LOGGER = get_logger()
 
@@ -26,6 +27,13 @@ class BaseStream(ABC):
      - `sync` and `get_records` method for performing sync
     """
 
+    tap_stream_id = None
+    replication_method = None
+    replication_key = None
+    key_properties = []
+    valid_replication_keys = []
+    params = {}
+    schema = {}
     url_endpoint = ""
     path = ""
     page_size = 100
@@ -37,42 +45,22 @@ class BaseStream(ABC):
     parent_bookmark_key = ""
     http_method = "POST"
 
-    def __init__(self, client=None, catalog=None) -> None:
+    def __init__(self, client: Client = None, catalog=None) -> None:
         self.client = client
         self.catalog = catalog
-        self.schema = catalog.schema.to_dict()
-        self.metadata = metadata.to_map(catalog.metadata)
+        if catalog:
+            self.schema = catalog.schema.to_dict()
+            self.metadata = metadata.to_map(catalog.metadata)
+        else:
+            self.metadata = {}
         self.child_to_sync = []
         self.params = {}
         self.data_payload = {}
 
-    @property
-    @abstractmethod
-    def tap_stream_id(self) -> str:
-        """Unique identifier for the stream.
-
-        This is allowed to be different from the name of the stream, in
-        order to allow for sources that have duplicate stream names.
-        """
-
-    @property
-    @abstractmethod
-    def replication_method(self) -> str:
-        """Defines the sync mode of a stream."""
-
-    @property
-    @abstractmethod
-    def replication_keys(self) -> List:
-        """Defines the replication key for incremental sync mode of a
-        stream."""
-
-    @property
-    @abstractmethod
-    def key_properties(self) -> Tuple[str, str]:
-        """List of key properties for stream."""
-
     def is_selected(self):
-        return metadata.get(self.metadata, (), "selected")
+        if self.catalog:
+            return metadata.get(self.metadata, (), "selected")
+        return True
 
     @abstractmethod
     def sync(
