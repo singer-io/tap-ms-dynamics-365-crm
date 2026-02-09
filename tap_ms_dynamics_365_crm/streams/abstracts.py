@@ -44,6 +44,7 @@ class BaseStream(ABC):
     data_key = ""
     parent_bookmark_key = ""
     http_method = "POST"
+    module = None
 
     def __init__(self, client: Client = None, catalog=None) -> None:
         self.client = client

@@ -61,7 +61,7 @@ def call_entity_definitions(client: Client):
 
     yield from results.get('value')
 
-def build_entity_metadata(client: Client, included_entities: set):
+def build_entity_metadata(client: Client, included_entities: dict):
     """Builds entity metadata from the `$metadata` endpoints."""
     entity_definitions = call_entity_definitions(client)
     metadata = client.make_request(method='GET', path='$metadata')
@@ -69,13 +69,21 @@ def build_entity_metadata(client: Client, included_entities: set):
 
     for entity in entity_definitions:
         entity_name = entity.get("LogicalName")
-        if entity_name in included_entities and entity_name in entity_metadata:
+        if any(entity_name in entities for entities in included_entities.values()) and entity_name in entity_metadata:
             # checks that entity is in $metadata response
             entity_metadata[entity_name]["LogicalName"] = entity_name
             entity_metadata[entity_name]["EntitySetName"] = entity.get("EntitySetName")
+
+            # Determine module name by checking which module set contains this entity
+            module_name = None
+            for module, entities in included_entities.items():
+                if entity_name in entities:
+                    module_name = module
+                    break
+            entity_metadata[entity_name]["module_name"] = module_name
             yield entity_metadata[entity_name]
 
-def get_streams(client: Client, included_entities: set = None, excluded_entities: set = None) -> dict:
+def get_streams(client: Client, included_entities: dict = None, excluded_entities: set = None) -> dict:
     """Builds stream objects for all entities in MS Dynamics and returns a dict
     of stream_name: stream_obj."""
     if included_entities is None or excluded_entities is None:
@@ -90,6 +98,7 @@ def get_streams(client: Client, included_entities: set = None, excluded_entities
         stream_name = stream.get('LogicalName')
         stream_endpoint = stream.get('EntitySetName')
         stream_key = stream.get('Key')
+        module_name = stream.get('module_name')
         LOGGER.info('Processing stream: {}'.format(stream_name))
 
         # skip over any streams that don't have a name or are in EXCLUDED_ENTITIES
@@ -110,6 +119,7 @@ def get_streams(client: Client, included_entities: set = None, excluded_entities
         stream_obj.key_properties = [stream_key]
         stream_obj.url_endpoint = stream_endpoint
         stream_obj.replication_method = replication_method
+        stream_obj.module = module_name
 
         if replication_method == 'INCREMENTAL':
             stream_obj.replication_key = replication_key
