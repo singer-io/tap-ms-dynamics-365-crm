@@ -46,12 +46,15 @@ def raise_for_error(response: requests.Response) -> None:
         error_code = None
 
         # Check for error object (common in MS Dynamics responses)
-        error_obj = response_json.get("error")
-        if isinstance(error_obj, dict):
-            error_message = error_obj.get("message")
-            error_code = error_obj.get("code")
-        elif isinstance(error_obj, str):
-            error_message = error_obj
+        if isinstance(response_json, dict):
+            error_obj = response_json.get("error")
+            if isinstance(error_obj, dict):
+                error_message = error_obj.get("message")
+                error_code = error_obj.get("code")
+            elif isinstance(error_obj, str):
+                error_message = error_obj
+        else:
+            error_message = str(response_json)
 
         # Fallback to default error message
         if not error_message:

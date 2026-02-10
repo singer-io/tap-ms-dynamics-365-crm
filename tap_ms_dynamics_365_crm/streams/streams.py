@@ -96,6 +96,7 @@ def get_streams(client: Client, create_schema: bool = True) -> dict:
     excluded_entities = EXCLUDED_ENTITIES
 
     STREAMS = {} # pylint: disable=invalid-name
+    replication_key = 'modifiedon'
 
     # dynamically build streams by iterating over entities and calling build_schema()
     for stream in build_entity_metadata(client, included_entities):
@@ -126,8 +127,8 @@ def get_streams(client: Client, create_schema: bool = True) -> dict:
         stream_obj.module = module_name
 
         if replication_method == 'INCREMENTAL':
-            stream_obj.replication_key = replication_key
-            stream_obj.valid_replication_keys = ['modifiedon']
+            stream_obj.replication_keys = [replication_key]
+            stream_obj.valid_replication_keys = [replication_key]
 
         if create_schema:
             # build schema and skip over any streams with no valid fields

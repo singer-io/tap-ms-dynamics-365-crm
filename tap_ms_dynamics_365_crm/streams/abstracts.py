@@ -11,7 +11,7 @@ from singer import (
     write_schema,
     metadata
 )
-from tap_ms_dynamics_365_crm.client import Client
+from tap_ms_dynamics_365_crm.client import Client, MAX_PAGESIZE
 
 LOGGER = get_logger()
 
@@ -29,7 +29,7 @@ class BaseStream(ABC):
 
     tap_stream_id = None
     replication_method = None
-    replication_key = None
+    replication_keys = []
     key_properties = []
     valid_replication_keys = []
     params = {}
@@ -44,13 +44,17 @@ class BaseStream(ABC):
     parent_bookmark_key = ""
     http_method = "GET"
     module = None
+    bookmark_value = None
 
     def __init__(self, client: Client = None) -> None:
         self.client = client
         self.child_to_sync = []
         self.params = {}
+        self.catalog = None
+        self.metadata = {}
+        self.schema = {}
         self.headers = self.headers.copy()
-        self.max_pagesize = self.client.max_pagesize
+        self.max_pagesize = self.client.max_pagesize if self.client else MAX_PAGESIZE
         self.page_size = self.page_size if self.page_size <= self.max_pagesize else self.max_pagesize
 
     def is_selected(self):
@@ -152,20 +156,20 @@ class IncrementalStream(BaseStream):
         return get_bookmark(
             state,
             stream,
-            key or self.replication_key,
+            key or self.replication_keys[0],
             self.client.config["start_date"],
         )
 
     def write_bookmark(self, state: dict, stream: str, key: Any = None, value: Any = None) -> Dict:
         """A wrapper for singer.get_bookmark to deal with compatibility for
         bookmark values or start values."""
-        if not (key or self.replication_key):
+        if not (key or self.replication_keys[0]):
             return state
 
-        current_bookmark = get_bookmark(state, stream, key or self.replication_key, self.client.config["start_date"])
+        current_bookmark = get_bookmark(state, stream, key or self.replication_keys[0], self.client.config["start_date"])
         value = max(current_bookmark, value)
         return write_bookmark(
-            state, stream, key or self.replication_key, value
+            state, stream, key or self.replication_keys[0], value
         )
 
 
@@ -189,7 +193,7 @@ class IncrementalStream(BaseStream):
                     record, self.schema, self.metadata
                 )
 
-                record_bookmark = transformed_record[self.replication_key]
+                record_bookmark = transformed_record[self.replication_keys[0]]
                 if record_bookmark >= bookmark_date:
                     if self.is_selected():
                         write_record(self.tap_stream_id, transformed_record)
