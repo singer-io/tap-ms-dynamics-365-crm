@@ -19,7 +19,6 @@ class MSDynamics365CrmUnauthorizedError(MSDynamics365CrmError):
     """class representing 401 status code."""
     pass
 
-
 class MSDynamics365CrmForbiddenError(MSDynamics365CrmError):
     """class representing 403 status code."""
     pass
@@ -36,7 +35,7 @@ class MSDynamics365CrmUnprocessableEntityError(MSDynamics365CrmBackoffError):
     """class representing 422 status code."""
     pass
 
-class MSDynamics365CrmRateLimitError(MSDynamics365CrmBackoffError):
+class MSDynamics365CrmRateLimitError(MSDynamics365CrmError):
     """class representing 429 status code."""
     pass
 
@@ -103,4 +102,3 @@ ERROR_CODE_EXCEPTION_MAPPING = {
         "message": "API service is currently unavailable."
     }
 }
-

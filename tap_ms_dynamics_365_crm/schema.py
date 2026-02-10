@@ -9,35 +9,6 @@ from tap_ms_dynamics_365_crm.streams import get_streams
 LOGGER = singer.get_logger()
 
 
-def get_abs_path(path: str) -> str:
-    """
-    Get the absolute path for the schema files.
-    """
-    return os.path.join(os.path.dirname(os.path.realpath(__file__)), path)
-
-
-def load_schema_references() -> Dict:
-    """
-    Load the schema files from the schema folder and return the schema references.
-    """
-    shared_schema_path = get_abs_path("schemas/shared")
-
-    shared_file_names = []
-    if os.path.exists(shared_schema_path):
-        shared_file_names = [
-            f
-            for f in os.listdir(shared_schema_path)
-            if os.path.isfile(os.path.join(shared_schema_path, f))
-        ]
-
-    refs = {}
-    for shared_schema_file in shared_file_names:
-        with open(os.path.join(shared_schema_path, shared_schema_file)) as data_file:
-            refs["shared/" + shared_schema_file] = json.load(data_file)
-
-    return refs
-
-
 def get_schemas(client: Client) -> Tuple[Dict, Dict]:
     """
     Load the schema references, prepare metadata for each streams and return schema and metadata for the catalog.

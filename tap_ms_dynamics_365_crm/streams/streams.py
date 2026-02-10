@@ -83,13 +83,17 @@ def build_entity_metadata(client: Client, included_entities: dict):
             entity_metadata[entity_name]["module_name"] = module_name
             yield entity_metadata[entity_name]
 
-def get_streams(client: Client, included_entities: dict = None, excluded_entities: set = None) -> dict:
+def get_streams(client: Client, create_schema: bool = True) -> dict:
     """Builds stream objects for all entities in MS Dynamics and returns a dict
-    of stream_name: stream_obj."""
-    if included_entities is None or excluded_entities is None:
-        from tap_ms_dynamics_365_crm.streams import INCLUDED_ENTITIES, EXCLUDED_ENTITIES
-        included_entities = included_entities or INCLUDED_ENTITIES
-        excluded_entities = excluded_entities or EXCLUDED_ENTITIES
+    of stream_name: stream_obj.
+
+    Args:
+        client: MS Dynamics client instance
+        create_schema: Flag to control schema creation (default: True)
+    """
+    from tap_ms_dynamics_365_crm.streams import INCLUDED_ENTITIES, EXCLUDED_ENTITIES
+    included_entities = INCLUDED_ENTITIES
+    excluded_entities = EXCLUDED_ENTITIES
 
     STREAMS = {} # pylint: disable=invalid-name
 
@@ -117,7 +121,7 @@ def get_streams(client: Client, included_entities: dict = None, excluded_entitie
         stream_obj = stream_class(client)
         stream_obj.tap_stream_id = stream_name
         stream_obj.key_properties = [stream_key]
-        stream_obj.url_endpoint = stream_endpoint
+        stream_obj.path = stream_endpoint
         stream_obj.replication_method = replication_method
         stream_obj.module = module_name
 
@@ -125,16 +129,19 @@ def get_streams(client: Client, included_entities: dict = None, excluded_entitie
             stream_obj.replication_key = replication_key
             stream_obj.valid_replication_keys = ['modifiedon']
 
-        # build schema and skip over any streams with no valid fields
-        stream_obj.schema = build_schema(attributes)
-        if not stream_obj.schema.get('properties'):
-            continue
+        if create_schema:
+            # build schema and skip over any streams with no valid fields
+            stream_obj.schema = build_schema(attributes)
+            if not stream_obj.schema.get('properties'):
+                continue
 
-        # Add key to the schema if missing
-        if stream_obj.key_properties[0] not in stream_obj.schema.get('properties'):
-            stream_obj.schema['properties'][stream_obj.key_properties[0]] = {
-                'type': ['null', 'string']
-            }
+            # Add key to the schema if missing
+            if stream_obj.key_properties[0] not in stream_obj.schema.get('properties'):
+                stream_obj.schema['properties'][stream_obj.key_properties[0]] = {
+                    'type': ['null', 'string']
+                }
+        else:
+            stream_obj.schema = {}
 
         STREAMS.update({stream_name: stream_obj})
 

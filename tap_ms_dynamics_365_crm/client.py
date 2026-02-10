@@ -1,7 +1,8 @@
+import sys
+import math
 from typing import Any, Dict, Mapping, Optional, Tuple
 from datetime import datetime, timedelta
 import json
-import time
 
 import backoff
 import requests
@@ -11,7 +12,12 @@ from requests.exceptions import Timeout, ConnectionError, ChunkedEncodingError
 from singer import get_logger, metrics
 
 from tap_ms_dynamics_365_crm.xml_transformer import transform_metadata_xml
-from tap_ms_dynamics_365_crm.exceptions import ERROR_CODE_EXCEPTION_MAPPING, MSDynamics365CrmError, MSDynamics365CrmBackoffError
+from tap_ms_dynamics_365_crm.exceptions import (
+    ERROR_CODE_EXCEPTION_MAPPING,
+    MSDynamics365CrmError,
+    MSDynamics365CrmBackoffError,
+    MSDynamics365CrmRateLimitError
+)
 
 LOGGER = get_logger()
 REQUEST_TIMEOUT = 300
@@ -33,18 +39,64 @@ def raise_for_error(response: requests.Response) -> None:
         response_json = response.json()
     except Exception:
         response_json = {}
+
     if response.status_code not in [200, 201, 204]:
-        if response_json.get("error"):
-            message = f"HTTP-error-code: {response.status_code}, Error: {response_json.get('error')}"
-        else:
+        # Try to extract error message from various possible locations in response
+        error_message = None
+        error_code = None
+
+        # Check for error object (common in MS Dynamics responses)
+        error_obj = response_json.get("error")
+        if isinstance(error_obj, dict):
+            error_message = error_obj.get("message")
+            error_code = error_obj.get("code")
+        elif isinstance(error_obj, str):
+            error_message = error_obj
+
+        # Fallback to default error message
+        if not error_message:
             error_message = ERROR_CODE_EXCEPTION_MAPPING.get(
                 response.status_code, {}
             ).get("message", "Unknown Error")
-            message = f"HTTP-error-code: {response.status_code}, Error: {response_json.get('message', error_message)}"
+
+        # Build final message
+        if error_code:
+            message = f"HTTP-error-code: {response.status_code}, Error Code: {error_code}, Error: {error_message}"
+        else:
+            message = f"HTTP-error-code: {response.status_code}, Error: {error_message}"
+
         exc = ERROR_CODE_EXCEPTION_MAPPING.get(response.status_code, {}).get(
             "raise_exception", MSDynamics365CrmError
         )
         raise exc(message, response) from None
+
+def retry_after_wait_gen():
+    """
+    Generator function to retrieve 'Retry-After' header from the exception response and
+    sleep for the specified time.
+    This is used in the backoff decorator to handle rate limiting (HTTP 429) errors
+    """
+    while True:
+        # This is called in an except block so we can retrieve the exception
+        # and check it. However, the generator is initialized before any exception,
+        # so we need to handle the case where exc_info[1] is None.
+        exc_info = sys.exc_info()
+        if exc_info[1] is not None and hasattr(exc_info[1], 'response'):
+            resp = exc_info[1].response
+            if resp and hasattr(resp, 'headers'):
+                sleep_time_str = resp.headers.get('Retry-After')
+                if sleep_time_str:
+                    try:
+                        sleep_time = math.floor(float(sleep_time_str))
+                        LOGGER.info(f'API rate limit exceeded -- sleeping for '
+                                    f'{sleep_time} seconds')
+                        yield sleep_time
+                        continue
+                    except (ValueError, TypeError):
+                        pass
+        # Default sleep time if we can't get it from the response
+        yield 60
+
 
 class Client:
     """
@@ -74,7 +126,17 @@ class Client:
 
         self._session = session()
         self.base_url = f"{self.organization_uri}/api/data/v{self.api_version}"
-        self.request_timeout = float(config.get("request_timeout", REQUEST_TIMEOUT))
+
+        # Handle request_timeout with validation
+        config_request_timeout = config.get("request_timeout")
+        if config_request_timeout:
+            try:
+                timeout_value = float(config_request_timeout)
+                self.request_timeout = timeout_value if timeout_value > 0 else REQUEST_TIMEOUT
+            except (ValueError, TypeError):
+                self.request_timeout = REQUEST_TIMEOUT
+        else:
+            self.request_timeout = REQUEST_TIMEOUT
 
     def __enter__(self):
         self.check_api_credentials()
@@ -145,6 +207,7 @@ class Client:
         return self._access_token
 
     def _get_standard_headers(self):
+        """Return standard headers for API request."""
         return {
             "Authorization": "Bearer {}".format(self.get_access_token()),
             "User-Agent": self.user_agent,
@@ -187,6 +250,14 @@ class Client:
             timeout=self.request_timeout
         )
 
+    @backoff.on_exception(
+        wait_gen=retry_after_wait_gen,
+        exception=(
+            MSDynamics365CrmRateLimitError,
+        ),
+        max_tries=MAX_RETRIES,
+        jitter=None
+    )
     @backoff.on_exception(
         wait_gen=backoff.expo,
         exception=(
