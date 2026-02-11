@@ -216,7 +216,8 @@ class Client:
             "User-Agent": self.user_agent,
             "OData-MaxVersion": "4.0",
             "OData-Version": "4.0",
-            "If-None-Match": "null"
+            "If-None-Match": "null",
+            "Content-Type": "application/json"
         }
 
     def authenticate(self, headers: Dict, params: Dict) -> Tuple[Dict, Dict]:
@@ -245,13 +246,17 @@ class Client:
         body = body or {}
         endpoint = endpoint or f"{self.base_url}/{path}"
         headers, params = self.authenticate(headers, params)
-        return self.__make_request(
-            method, endpoint,
-            headers=headers,
-            params=params,
-            data=body,
-            timeout=self.request_timeout
-        )
+
+        # Use json parameter for POST/PATCH to properly serialize body
+        kwargs = {
+            "headers": headers,
+            "params": params,
+            "timeout": self.request_timeout
+        }
+        if method.upper() in ("POST", "PATCH", "PUT") and body:
+            kwargs["json"] = body
+
+        return self.__make_request(method, endpoint, **kwargs)
 
     @backoff.on_exception(
         wait_gen=retry_after_wait_gen,
@@ -279,9 +284,7 @@ class Client:
         """Performs HTTP Operations."""
         method = method.upper()
         with metrics.http_request_timer(endpoint):
-            if method in ("GET", "POST"):
-                if method == "GET":
-                    kwargs.pop("data", None)
+            if method in ("GET", "POST", "PATCH", "PUT", "DELETE"):
                 response = self._session.request(method, endpoint, **kwargs)
                 raise_for_error(response)
             else:
