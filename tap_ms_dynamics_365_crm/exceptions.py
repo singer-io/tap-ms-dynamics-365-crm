@@ -35,7 +35,7 @@ class MSDynamics365CrmUnprocessableEntityError(MSDynamics365CrmBackoffError):
     """class representing 422 status code."""
     pass
 
-class MSDynamics365CrmRateLimitError(MSDynamics365CrmError):
+class MSDynamics365CrmRateLimitError(MSDynamics365CrmBackoffError):
     """class representing 429 status code."""
     pass
 

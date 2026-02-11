@@ -15,8 +15,12 @@ from tap_ms_dynamics_365_crm.xml_transformer import transform_metadata_xml
 from tap_ms_dynamics_365_crm.exceptions import (
     ERROR_CODE_EXCEPTION_MAPPING,
     MSDynamics365CrmError,
-    MSDynamics365CrmBackoffError,
-    MSDynamics365CrmRateLimitError
+    MSDynamics365CrmRateLimitError,
+    MSDynamics365CrmUnprocessableEntityError,
+    MSDynamics365CrmInternalServerError,
+    MSDynamics365CrmNotImplementedError,
+    MSDynamics365CrmBadGatewayError,
+    MSDynamics365CrmServiceUnavailableError
 )
 
 LOGGER = get_logger()
@@ -77,28 +81,36 @@ def retry_after_wait_gen():
     """
     Generator function to retrieve 'Retry-After' header from the exception response and
     sleep for the specified time.
-    This is used in the backoff decorator to handle rate limiting (HTTP 429) errors
+    This is used in the backoff decorator to handle rate limiting (HTTP 429) errors.
+    The generator runs indefinitely - the backoff decorator controls when to stop via max_tries.
     """
+    DEFAULT_WAIT_TIME = 60
+
+    # Generator yields indefinitely; backoff decorator controls termination via max_tries
     while True:
-        # This is called in an except block so we can retrieve the exception
-        # and check it. However, the generator is initialized before any exception,
-        # so we need to handle the case where exc_info[1] is None.
         exc_info = sys.exc_info()
+        sleep_time = DEFAULT_WAIT_TIME
+
+        # Try to extract Retry-After header from the exception response
         if exc_info[1] is not None and hasattr(exc_info[1], 'response'):
             resp = exc_info[1].response
             if resp and hasattr(resp, 'headers'):
                 sleep_time_str = resp.headers.get('Retry-After')
                 if sleep_time_str:
                     try:
-                        sleep_time = math.floor(float(sleep_time_str))
-                        LOGGER.info(f'API rate limit exceeded -- sleeping for '
-                                    f'{sleep_time} seconds')
-                        yield sleep_time
-                        continue
+                        parsed_sleep_time = math.floor(float(sleep_time_str))
+                        if parsed_sleep_time > 0:
+                            sleep_time = parsed_sleep_time
+                            LOGGER.info(f'API rate limit exceeded -- sleeping for '
+                                        f'{sleep_time} seconds')
+                        else:
+                            LOGGER.warning(f'Invalid Retry-After value: {sleep_time_str}, '
+                                           f'using default {DEFAULT_WAIT_TIME}s')
                     except (ValueError, TypeError):
-                        pass
-        # Default sleep time if we can't get it from the response
-        yield 60
+                        LOGGER.warning(f'Could not parse Retry-After header: {sleep_time_str}, '
+                                       f'using default {DEFAULT_WAIT_TIME}s')
+
+        yield sleep_time
 
 
 class Client:
@@ -132,12 +144,21 @@ class Client:
 
         # Handle request_timeout with validation
         config_request_timeout = config.get("request_timeout")
-        if config_request_timeout:
+        if config_request_timeout is not None:
             try:
                 timeout_value = float(config_request_timeout)
-                self.request_timeout = timeout_value if timeout_value > 0 else REQUEST_TIMEOUT
-            except (ValueError, TypeError):
-                self.request_timeout = REQUEST_TIMEOUT
+            except (ValueError, TypeError) as e:
+                raise ValueError(
+                    f"Invalid request_timeout value: '{config_request_timeout}'. "
+                    f"Must be a positive number."
+                ) from e
+
+            if timeout_value <= 0:
+                raise ValueError(
+                    f"Invalid request_timeout value: {timeout_value}. "
+                    f"Must be greater than 0."
+                )
+            self.request_timeout = timeout_value
         else:
             self.request_timeout = REQUEST_TIMEOUT
 
@@ -273,7 +294,11 @@ class Client:
             ConnectionError,
             ChunkedEncodingError,
             Timeout,
-            MSDynamics365CrmBackoffError
+            MSDynamics365CrmUnprocessableEntityError,
+            MSDynamics365CrmInternalServerError,
+            MSDynamics365CrmNotImplementedError,
+            MSDynamics365CrmBadGatewayError,
+            MSDynamics365CrmServiceUnavailableError
         ),
         max_tries=MAX_RETRIES,
         factor=2,

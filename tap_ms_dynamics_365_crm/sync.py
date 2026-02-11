@@ -20,9 +20,18 @@ def update_currently_syncing(state: Dict, stream_name: str) -> None:
 
 def get_stream_object(streams: dict, catalog: singer.Catalog, stream_name: str):
     """
-    get stream object for stream name and enrich it with catalog metadata
+    Get stream object for stream name and enrich it with catalog metadata.
+    
+    :param streams: Dictionary of available stream objects
+    :param catalog: Singer catalog with stream metadata
+    :param stream_name: Name of the stream to retrieve
+    :return: Enriched stream object with catalog metadata
+    :raises KeyError: If stream_name is not found in streams
     """
     stream = streams.get(stream_name)
+    if stream is None:
+        raise KeyError(f"Stream '{stream_name}' not found in available streams")
+
     stream_catalog_entry = catalog.get_stream(stream_name)
     stream_metadata = singer.metadata.to_map(stream_catalog_entry.metadata)
     stream_schema = stream_catalog_entry.schema.to_dict()
