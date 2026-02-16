@@ -5,27 +5,29 @@ Creates test records for Sales, Field Service, and Customer Service modules.
 
 Usage:
     # Create data for all sales entities
-    python create_test_data_comprehensive.py --config config.json --module sales --count 5
+    python -m spike.create_test_data_comprehensive --config config.json --module sales --count 5
 
     # Create data for specific entities
-    python create_test_data_comprehensive.py --config config.json --entities account,contact,lead --count 10
+    python -m spike.create_test_data_comprehensive --config config.json --entities account,contact,lead --count 10
 
     # Create data for all modules
-    python create_test_data_comprehensive.py --config config.json --module all --count 3
+    python -m spike.create_test_data_comprehensive --config config.json --module all --count 3
 
     # Cleanup previously created data
-    python create_test_data_comprehensive.py --config config.json --cleanup
+    python -m spike.create_test_data_comprehensive --config config.json --cleanup
+
+Note: Run from the project root directory, or install the package in editable mode:
+    pip install -e .
 """
 
+import sys
 import argparse
 import json
-import sys
 import random
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from faker import Faker
 
-sys.path.insert(0, '..')
 from tap_ms_dynamics_365_crm.client import Client
 from tap_ms_dynamics_365_crm.streams import INCLUDED_ENTITIES, get_streams
 from entity_templates import ENTITY_TEMPLATES

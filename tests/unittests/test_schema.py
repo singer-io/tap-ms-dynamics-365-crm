@@ -1,7 +1,5 @@
 import unittest
-import os
-import json
-from unittest.mock import MagicMock, patch, mock_open
+from unittest.mock import MagicMock, patch
 from tap_ms_dynamics_365_crm.schema import get_schemas
 
 

@@ -1,7 +1,6 @@
 import unittest
 import requests
-import sys
-from unittest.mock import patch, MagicMock, Mock
+from unittest.mock import patch
 from parameterized import parameterized
 from requests.exceptions import Timeout, ConnectionError, ChunkedEncodingError
 from tap_ms_dynamics_365_crm.client import Client, raise_for_error, retry_after_wait_gen

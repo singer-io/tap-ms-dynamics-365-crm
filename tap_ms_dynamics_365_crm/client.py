@@ -8,7 +8,11 @@ import backoff
 import requests
 from requests import session
 from simplejson import JSONDecodeError
-from requests.exceptions import Timeout, ConnectionError, ChunkedEncodingError
+from requests.exceptions import (
+    Timeout,
+    ConnectionError as RequestsConnectionError,
+    ChunkedEncodingError
+)
 from singer import get_logger, metrics
 
 from tap_ms_dynamics_365_crm.xml_transformer import transform_metadata_xml
@@ -42,6 +46,7 @@ def raise_for_error(response: requests.Response) -> None:
     try:
         response_json = response.json()
     except Exception:
+        LOGGER.warning("Failed to parse JSON from response. Response text.")
         response_json = {}
 
     if response.status_code not in [200, 201, 204]:
@@ -291,7 +296,7 @@ class Client:
         wait_gen=backoff.expo,
         exception=(
             ConnectionResetError,
-            ConnectionError,
+            RequestsConnectionError,
             ChunkedEncodingError,
             Timeout,
             MSDynamics365CrmUnprocessableEntityError,

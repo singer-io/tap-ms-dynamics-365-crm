@@ -27,33 +27,32 @@ class BaseStream(ABC):
      - `sync` and `get_records` method for performing sync
     """
 
-    tap_stream_id = None
-    replication_method = None
-    replication_keys = []
-    key_properties = []
-    valid_replication_keys = []
-    params = {}
-    schema = {}
     url_endpoint = ""
     path = ""
     page_size = 100
-    headers = {'Accept': 'application/json'}
-    children = []
     parent = ""
     data_key = "value"
     parent_bookmark_key = ""
     http_method = "GET"
     module = None
-    bookmark_value = None
 
     def __init__(self, client: Client = None) -> None:
         self.client = client
+
         self.child_to_sync = []
+        self.tap_stream_id = None
+        self.replication_method = None
+        self.replication_keys = []
+        self.key_properties = []
+        self.valid_replication_keys = []
+        self.children = []
         self.params = {}
         self.catalog = None
         self.metadata = {}
         self.schema = {}
-        self.headers = self.headers.copy()
+        self.headers = {'Accept': 'application/json'}
+        self.bookmark_value = None
+
         self.max_pagesize = self.client.max_pagesize if self.client else MAX_PAGESIZE
         self.page_size = self.page_size if self.page_size <= self.max_pagesize else self.max_pagesize
 

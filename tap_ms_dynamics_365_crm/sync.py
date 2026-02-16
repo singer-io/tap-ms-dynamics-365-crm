@@ -21,7 +21,7 @@ def update_currently_syncing(state: Dict, stream_name: str) -> None:
 def get_stream_object(streams: dict, catalog: singer.Catalog, stream_name: str):
     """
     Get stream object for stream name and enrich it with catalog metadata.
-    
+
     :param streams: Dictionary of available stream objects
     :param catalog: Singer catalog with stream metadata
     :param stream_name: Name of the stream to retrieve
