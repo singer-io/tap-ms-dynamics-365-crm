@@ -1,5 +1,3 @@
-import os
-import json
 import singer
 from typing import Dict, Tuple
 from singer import metadata

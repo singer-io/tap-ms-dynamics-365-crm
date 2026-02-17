@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
-import json
-from typing import Any, Dict, Tuple, List, Iterator
+from typing import Any, Dict, Iterator
 from singer import (
     Transformer,
     get_bookmark,
