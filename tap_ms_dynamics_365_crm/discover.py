@@ -2,15 +2,16 @@ import singer
 from singer import metadata
 from singer.catalog import Catalog, CatalogEntry, Schema
 from tap_ms_dynamics_365_crm.schema import get_schemas
+from tap_ms_dynamics_365_crm.client import Client
 
 LOGGER = singer.get_logger()
 
 
-def discover() -> Catalog:
+def discover(client: Client) -> Catalog:
     """
     Run the discovery mode, prepare the catalog file and return the catalog.
     """
-    schemas, field_metadata = get_schemas()
+    schemas, field_metadata = get_schemas(client=client)
     catalog = Catalog([])
 
     for stream_name, schema_dict in schemas.items():

@@ -1,15 +1,31 @@
+import sys
+import math
 from typing import Any, Dict, Mapping, Optional, Tuple
 from datetime import datetime, timedelta
 import json
-import time
 
 import backoff
 import requests
 from requests import session
-from requests.exceptions import Timeout, ConnectionError, ChunkedEncodingError
+from simplejson import JSONDecodeError
+from requests.exceptions import (
+    Timeout,
+    ConnectionError as RequestsConnectionError,
+    ChunkedEncodingError
+)
 from singer import get_logger, metrics
 
-from tap_ms_dynamics_365_crm.exceptions import ERROR_CODE_EXCEPTION_MAPPING, MSDynamics365CrmError, MSDynamics365CrmBackoffError
+from tap_ms_dynamics_365_crm.xml_transformer import transform_metadata_xml
+from tap_ms_dynamics_365_crm.exceptions import (
+    ERROR_CODE_EXCEPTION_MAPPING,
+    MSDynamics365CrmError,
+    MSDynamics365CrmRateLimitError,
+    MSDynamics365CrmUnprocessableEntityError,
+    MSDynamics365CrmInternalServerError,
+    MSDynamics365CrmNotImplementedError,
+    MSDynamics365CrmBadGatewayError,
+    MSDynamics365CrmServiceUnavailableError
+)
 
 LOGGER = get_logger()
 REQUEST_TIMEOUT = 300
@@ -30,19 +46,77 @@ def raise_for_error(response: requests.Response) -> None:
     try:
         response_json = response.json()
     except Exception:
+        LOGGER.warning("Failed to parse JSON from response. Response text.")
         response_json = {}
+
     if response.status_code not in [200, 201, 204]:
-        if response_json.get("error"):
-            message = f"HTTP-error-code: {response.status_code}, Error: {response_json.get('error')}"
+        # Try to extract error message from various possible locations in response
+        error_message = None
+        error_code = None
+
+        # Check for error object (common in MS Dynamics responses)
+        if isinstance(response_json, dict):
+            error_obj = response_json.get("error")
+            if isinstance(error_obj, dict):
+                error_message = error_obj.get("message")
+                error_code = error_obj.get("code")
+            elif isinstance(error_obj, str):
+                error_message = error_obj
         else:
+            error_message = str(response_json)
+
+        # Fallback to default error message
+        if not error_message:
             error_message = ERROR_CODE_EXCEPTION_MAPPING.get(
                 response.status_code, {}
             ).get("message", "Unknown Error")
-            message = f"HTTP-error-code: {response.status_code}, Error: {response_json.get('message', error_message)}"
+
+        # Build final message
+        if error_code:
+            message = f"HTTP-error-code: {response.status_code}, Error Code: {error_code}, Error: {error_message}"
+        else:
+            message = f"HTTP-error-code: {response.status_code}, Error: {error_message}"
+
         exc = ERROR_CODE_EXCEPTION_MAPPING.get(response.status_code, {}).get(
             "raise_exception", MSDynamics365CrmError
         )
         raise exc(message, response) from None
+
+def retry_after_wait_gen():
+    """
+    Generator function to retrieve 'Retry-After' header from the exception response and
+    sleep for the specified time.
+    This is used in the backoff decorator to handle rate limiting (HTTP 429) errors.
+    The generator runs indefinitely - the backoff decorator controls when to stop via max_tries.
+    """
+    DEFAULT_WAIT_TIME = 60
+
+    # Generator yields indefinitely; backoff decorator controls termination via max_tries
+    while True:
+        exc_info = sys.exc_info()
+        sleep_time = DEFAULT_WAIT_TIME
+
+        # Try to extract Retry-After header from the exception response
+        if exc_info[1] is not None and hasattr(exc_info[1], 'response'):
+            resp = exc_info[1].response
+            if resp and hasattr(resp, 'headers'):
+                sleep_time_str = resp.headers.get('Retry-After')
+                if sleep_time_str:
+                    try:
+                        parsed_sleep_time = math.floor(float(sleep_time_str))
+                        if parsed_sleep_time > 0:
+                            sleep_time = parsed_sleep_time
+                            LOGGER.info(f'API rate limit exceeded -- sleeping for '
+                                        f'{sleep_time} seconds')
+                        else:
+                            LOGGER.warning(f'Invalid Retry-After value: {sleep_time_str}, '
+                                           f'using default {DEFAULT_WAIT_TIME}s')
+                    except (ValueError, TypeError):
+                        LOGGER.warning(f'Could not parse Retry-After header: {sleep_time_str}, '
+                                       f'using default {DEFAULT_WAIT_TIME}s')
+
+        yield sleep_time
+
 
 class Client:
     """
@@ -72,7 +146,26 @@ class Client:
 
         self._session = session()
         self.base_url = f"{self.organization_uri}/api/data/v{self.api_version}"
-        self.request_timeout = float(config.get("request_timeout", REQUEST_TIMEOUT))
+
+        # Handle request_timeout with validation
+        config_request_timeout = config.get("request_timeout")
+        if config_request_timeout is not None:
+            try:
+                timeout_value = float(config_request_timeout)
+            except (ValueError, TypeError) as e:
+                raise ValueError(
+                    f"Invalid request_timeout value: '{config_request_timeout}'. "
+                    f"Must be a positive number."
+                ) from e
+
+            if timeout_value <= 0:
+                raise ValueError(
+                    f"Invalid request_timeout value: {timeout_value}. "
+                    f"Must be greater than 0."
+                )
+            self.request_timeout = timeout_value
+        else:
+            self.request_timeout = REQUEST_TIMEOUT
 
     def __enter__(self):
         self.check_api_credentials()
@@ -143,12 +236,14 @@ class Client:
         return self._access_token
 
     def _get_standard_headers(self):
+        """Return standard headers for API request."""
         return {
-            "Authorization": "Bearer {}".format(self.get_access_token),
+            "Authorization": "Bearer {}".format(self.get_access_token()),
             "User-Agent": self.user_agent,
             "OData-MaxVersion": "4.0",
             "OData-Version": "4.0",
-            "If-None-Match": "null"
+            "If-None-Match": "null",
+            "Content-Type": "application/json"
         }
 
     def authenticate(self, headers: Dict, params: Dict) -> Tuple[Dict, Dict]:
@@ -163,7 +258,7 @@ class Client:
     def make_request(
         self,
         method: str,
-        endpoint: str,
+        endpoint: str = None,
         params: Optional[Dict[str, Any]] = None,
         headers: Optional[Dict[str, Any]] = None,
         body: Optional[Dict[str, Any]] = None,
@@ -177,22 +272,38 @@ class Client:
         body = body or {}
         endpoint = endpoint or f"{self.base_url}/{path}"
         headers, params = self.authenticate(headers, params)
-        return self.__make_request(
-            method, endpoint,
-            headers=headers,
-            params=params,
-            data=body,
-            timeout=self.request_timeout
-        )
 
+        # Use json parameter for POST/PATCH to properly serialize body
+        kwargs = {
+            "headers": headers,
+            "params": params,
+            "timeout": self.request_timeout
+        }
+        if method.upper() in ("POST", "PATCH", "PUT") and body:
+            kwargs["json"] = body
+
+        return self.__make_request(method, endpoint, **kwargs)
+
+    @backoff.on_exception(
+        wait_gen=retry_after_wait_gen,
+        exception=(
+            MSDynamics365CrmRateLimitError,
+        ),
+        max_tries=MAX_RETRIES,
+        jitter=None
+    )
     @backoff.on_exception(
         wait_gen=backoff.expo,
         exception=(
             ConnectionResetError,
-            ConnectionError,
+            RequestsConnectionError,
             ChunkedEncodingError,
             Timeout,
-            MSDynamics365CrmBackoffError
+            MSDynamics365CrmUnprocessableEntityError,
+            MSDynamics365CrmInternalServerError,
+            MSDynamics365CrmNotImplementedError,
+            MSDynamics365CrmBadGatewayError,
+            MSDynamics365CrmServiceUnavailableError
         ),
         max_tries=MAX_RETRIES,
         factor=2,
@@ -203,13 +314,15 @@ class Client:
         """Performs HTTP Operations."""
         method = method.upper()
         with metrics.http_request_timer(endpoint):
-            if method in ("GET", "POST"):
-                if method == "GET":
-                    kwargs.pop("data", None)
+            if method in ("GET", "POST", "PATCH", "PUT", "DELETE"):
                 response = self._session.request(method, endpoint, **kwargs)
                 raise_for_error(response)
             else:
                 raise ValueError(f"Unsupported method: {method}")
 
-        return response.json()
+        try:
+            results = response.json()
+        except JSONDecodeError:
+            results = response.text
 
+        return results
