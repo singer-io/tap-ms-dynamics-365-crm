@@ -9,6 +9,7 @@ from tap_ms_dynamics_365_crm.streams.abstracts import (
 from tap_ms_dynamics_365_crm.streams.streams import (
     get_streams,
     build_schema,
+    REPLICATION_TO_STREAM_MAP
 )
 
 EXCLUDED_ENTITIES = {

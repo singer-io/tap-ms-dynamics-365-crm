@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
-import json
-from typing import Any, Dict, Tuple, List, Iterator
+from typing import Any, Dict, Iterator
 from singer import (
     Transformer,
     get_bookmark,
@@ -11,7 +10,7 @@ from singer import (
     write_schema,
     metadata
 )
-from tap_ms_dynamics_365_crm.client import Client
+from tap_ms_dynamics_365_crm.client import Client, MAX_PAGESIZE
 
 LOGGER = get_logger()
 
@@ -27,36 +26,34 @@ class BaseStream(ABC):
      - `sync` and `get_records` method for performing sync
     """
 
-    tap_stream_id = None
-    replication_method = None
-    replication_key = None
-    key_properties = []
-    valid_replication_keys = []
-    params = {}
-    schema = {}
     url_endpoint = ""
     path = ""
     page_size = 100
-    next_page_key = "next_page"
-    headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
-    children = []
     parent = ""
-    data_key = ""
+    data_key = "value"
     parent_bookmark_key = ""
-    http_method = "POST"
+    http_method = "GET"
     module = None
 
-    def __init__(self, client: Client = None, catalog=None) -> None:
+    def __init__(self, client: Client = None) -> None:
         self.client = client
-        self.catalog = catalog
-        if catalog:
-            self.schema = catalog.schema.to_dict()
-            self.metadata = metadata.to_map(catalog.metadata)
-        else:
-            self.metadata = {}
+
         self.child_to_sync = []
+        self.tap_stream_id = None
+        self.replication_method = None
+        self.replication_keys = []
+        self.key_properties = []
+        self.valid_replication_keys = []
+        self.children = []
         self.params = {}
-        self.data_payload = {}
+        self.catalog = None
+        self.metadata = {}
+        self.schema = {}
+        self.headers = {'Accept': 'application/json'}
+        self.bookmark_value = None
+
+        self.max_pagesize = self.client.max_pagesize if self.client else MAX_PAGESIZE
+        self.page_size = self.page_size if self.page_size <= self.max_pagesize else self.max_pagesize
 
     def is_selected(self):
         if self.catalog:
@@ -88,22 +85,19 @@ class BaseStream(ABC):
 
     def get_records(self) -> Iterator:
         """Interacts with api client interaction and pagination."""
-        self.params["page"] = self.page_size
-        next_page = 1
-        while next_page:
-            response = self.client.make_request(
-                self.http_method,
-                self.url_endpoint,
-                self.params,
-                self.headers,
-                body=json.dumps(self.data_payload),
-                path=self.path
-            )
-            raw_records = response.get(self.data_key, [])
-            next_page = response.get(self.next_page_key)
+        next_page = True
+        endpoint = self.url_endpoint
 
-            self.params[self.next_page_key] = next_page
-            yield from raw_records
+        while next_page:
+            response = self.client.make_request(self.http_method, endpoint, headers=self.headers, params=self.params)
+
+            if '@odata.nextLink' in response:
+                endpoint = response.get('@odata.nextLink')
+                self.params = {}
+            else:
+                next_page = False
+
+            yield from response.get(self.data_key, [])
 
     def write_schema(self) -> None:
         """
@@ -117,17 +111,25 @@ class BaseStream(ABC):
             )
             raise err
 
-    def update_params(self, **kwargs) -> None:
+    def update_header(self, **kwargs) -> None:
         """
-        Update params for the stream
+        Update headers for the stream
         """
-        self.params.update(kwargs)
+        self.headers.update(kwargs)
 
-    def update_data_payload(self, **kwargs) -> None:
+    def update_params(self, orderby_key: str = 'modifiedon',
+                      replication_key: str = 'modifiedon',
+                      filter_value: str = None) -> None:
         """
-        Update JSON body for the stream
+        Build and update OData query parameters for the stream
         """
-        self.data_payload.update(kwargs)
+        orderby_param = f'{orderby_key} asc'
+
+        if filter_value:
+            filter_param = f'{replication_key} ge {filter_value}'
+            self.params = {"$orderby": orderby_param, "$filter": filter_param}
+        else:
+            self.params = {"$orderby": orderby_param}
 
     def modify_object(self, record: Dict, parent_record: Dict = None) -> Dict:
         """
@@ -144,7 +146,7 @@ class BaseStream(ABC):
 
 class IncrementalStream(BaseStream):
     """Base Class for Incremental Stream."""
-
+    replication_method = "INCREMENTAL"
 
     def get_bookmark(self, state: dict, stream: str, key: Any = None) -> int:
         """A wrapper for singer.get_bookmark to deal with compatibility for
@@ -159,7 +161,7 @@ class IncrementalStream(BaseStream):
     def write_bookmark(self, state: dict, stream: str, key: Any = None, value: Any = None) -> Dict:
         """A wrapper for singer.get_bookmark to deal with compatibility for
         bookmark values or start values."""
-        if not (key or self.replication_keys):
+        if not (key or self.replication_keys[0]):
             return state
 
         current_bookmark = get_bookmark(state, stream, key or self.replication_keys[0], self.client.config["start_date"])
@@ -178,8 +180,8 @@ class IncrementalStream(BaseStream):
         """Implementation for `type: Incremental` stream."""
         bookmark_date = self.get_bookmark(state, self.tap_stream_id)
         current_max_bookmark_date = bookmark_date
-        self.update_params(updated_since=bookmark_date)
-        self.update_data_payload(parent_obj=parent_obj)
+        self.update_params(filter_value=bookmark_date)
+        self.update_header(Prefer=f'odata.maxpagesize={self.page_size}')
         self.url_endpoint = self.get_url_endpoint(parent_obj)
 
         with metrics.record_counter(self.tap_stream_id) as counter:
@@ -208,7 +210,7 @@ class IncrementalStream(BaseStream):
 
 class FullTableStream(BaseStream):
     """Base Class for Incremental Stream."""
-
+    replication_method = "FULL_TABLE"
     replication_keys = []
 
     def sync(
@@ -219,7 +221,8 @@ class FullTableStream(BaseStream):
     ) -> Dict:
         """Abstract implementation for `type: Fulltable` stream."""
         self.url_endpoint = self.get_url_endpoint(parent_obj)
-        self.update_data_payload(parent_obj=parent_obj)
+        self.update_header(Prefer=f'odata.maxpagesize={self.page_size}')
+
         with metrics.record_counter(self.tap_stream_id) as counter:
             for record in self.get_records():
                 transformed_record = transformer.transform(
@@ -288,4 +291,3 @@ class ChildBaseStream(IncrementalStream):
             self.bookmark_value = super().get_bookmark(state, stream)
 
         return self.bookmark_value
-

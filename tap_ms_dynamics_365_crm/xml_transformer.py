@@ -24,8 +24,8 @@ def transform_metadata_xml(xml: str) -> dict:
 
     entity_def = {}
     for elem in entities.findall("edm:EntityType", NS):
-        # if an Entity doesn't have elements or a `Key` skip over it
-        if len(elem) and elem.find("edm:Key", NS):
+        # Only process entities that have child elements and a Key element
+        if len(elem) > 0 and elem.find("edm:Key", NS) is not None:
             entity_key = elem.find("edm:Key", NS).find("edm:PropertyRef", NS).get("Name")
             entity_name = elem.get("Name")
 
