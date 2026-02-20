@@ -61,19 +61,24 @@ class TestClient(unittest.TestCase):
         self.client = Client(config_path="config.json", config=default_config)
 
     @parameterized.expand([
-        ["empty value", "", DEFAULT_REQUEST_TIMEOUT],
-        ["string value", "12", 12.0],
-        ["integer value", 10, 10.0],
-        ["float value", 20.0, 20.0],
-        ["zero value", 0, DEFAULT_REQUEST_TIMEOUT]
+        ["string value", "12", 12.0, False],
+        ["integer value", 10, 10.0, False],
+        ["float value", 20.0, 20.0, False],
+        ["empty value", "", None, True],
+        ["zero value", 0, None, True]
     ])
     @patch("tap_ms_dynamics_365_crm.client.session")
-    def test_client_initialization(self, test_name, input_value, expected_value, mock_session):
+    def test_client_initialization(self, test_name, input_value, expected_value, should_raise, mock_session):
         test_config = default_config.copy()
         test_config["request_timeout"] = input_value
-        client = Client(config_path="config.json", config=test_config)
-        assert client.request_timeout == expected_value
-        assert isinstance(client._session, mock_session().__class__)
+
+        if should_raise:
+            with self.assertRaises(ValueError):
+                client = Client(config_path="config.json", config=test_config)
+        else:
+            client = Client(config_path="config.json", config=test_config)
+            assert client.request_timeout == expected_value
+            assert isinstance(client._session, mock_session().__class__)
 
     @parameterized.expand([
         ["400 error", 400, MSDynamics365CrmBadRequestError, "A validation exception has occurred."],

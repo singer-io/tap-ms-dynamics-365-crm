@@ -47,12 +47,14 @@ This tap:
    - `start_date` - the default value to use if no bookmark exists for an endpoint (rfc3339 date string)
    - `user_agent` (string, optional): Process and email for API logging purposes. Example: `tap-ms-dynamics-365-crm <api_user_email@your_company.com>`
    - `request_timeout` (integer, `300`): Max time for which request should wait to get a response. Default request_timeout is 300 seconds.
+    - `page_size` (integer, optional): OData page size. Default is `100`.
 
     ```json
     {
         "start_date": "2019-01-01T00:00:00Z",
         "user_agent": "tap-ms-dynamics-365-crm <api_user_email@your_company.com>",
-        "request_timeout": 300
+        "request_timeout": 300,
+        "page_size": 100
     }
 
     ```

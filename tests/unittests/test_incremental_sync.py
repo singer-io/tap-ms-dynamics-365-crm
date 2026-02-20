@@ -51,7 +51,7 @@ class TestIncrementalSync(unittest.TestCase):
         mock_get_bookmark.return_value = "2024-01-15T00:00:00Z"
         state = {'bookmarks': {'stream_1': {'updated_at': '2024-01-15T00:00:00Z'}}}
 
-        result = self.stream.get_bookmark(state, "stream_1")
+        result = self.stream.get_bookmark(state, "stream_1", "updated_at")
         self.assertEqual(result, "2024-01-15T00:00:00Z")
 
     def test_update_params(self):

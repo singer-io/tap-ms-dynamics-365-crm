@@ -53,6 +53,14 @@ class BaseStream(ABC):
         self.bookmark_value = None
 
         self.max_pagesize = self.client.max_pagesize if self.client else MAX_PAGESIZE
+        configured_page_size = None
+
+        if self.client and getattr(self.client, "config", None):
+            configured_page_size = self.client.config.get("page_size")
+
+        if configured_page_size is not None:
+            self.page_size = int(configured_page_size)
+
         self.page_size = self.page_size if self.page_size <= self.max_pagesize else self.max_pagesize
 
     def is_selected(self):

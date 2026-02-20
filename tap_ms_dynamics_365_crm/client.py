@@ -136,7 +136,7 @@ class Client:
         self.client_secret = config.get("client_secret")
         self.redirect_uri = config.get("redirect_uri")
         self.refresh_token = config.get("refresh_token")
-        self.api_version = config.get("api_version", API_VERSION)
+        self.api_version = API_VERSION
         self.max_pagesize = config.get("max_pagesize", MAX_PAGESIZE)
         self.start_date = config.get("start_date")
         self.user_agent = config.get("user_agent", USER_AGENT)
