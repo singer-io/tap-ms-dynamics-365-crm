@@ -19,6 +19,20 @@ This tap:
 
 ## Authentication
 
+The tap supports two authentication flows:
+
+- `authorization_code` (existing behavior)
+    - Requires: `client_id`, `client_secret`, `redirect_uri`, `refresh_token`
+- `client_credentials` (app-only)
+    - Requires: `client_id`, `tenant_id`, and either:
+        - `client_secret`, or
+        - `certificate_path` + `certificate_thumbprint`
+
+Notes:
+- `auth_method` defaults to `authorization_code` if omitted.
+- `refresh_token` and `redirect_uri` are only required for `authorization_code`.
+- For `client_credentials`, tokens are cached in memory and renewed on expiry.
+
 ## Quick Start
 
 1. Install
@@ -44,13 +58,33 @@ This tap:
     - [target-stitch](https://github.com/singer-io/target-stitch)
 
 3. Create your tap's `config.json` file.  The tap config file for this tap should include these entries:
+    - `auth_method` (string, optional): `authorization_code` or `client_credentials`.
+    - `client_id` (string, required)
+    - `organization_uri` (string, required)
    - `start_date` - the default value to use if no bookmark exists for an endpoint (rfc3339 date string)
    - `user_agent` (string, optional): Process and email for API logging purposes. Example: `tap-ms-dynamics-365-crm <api_user_email@your_company.com>`
    - `request_timeout` (integer, `300`): Max time for which request should wait to get a response. Default request_timeout is 300 seconds.
     - `page_size` (integer, optional): OData page size. Default is `100`.
 
+    Additional fields by auth method:
+    - `authorization_code`:
+        - `client_secret` (required)
+        - `redirect_uri` (required)
+        - `refresh_token` (required)
+    - `client_credentials`:
+        - `tenant_id` (required)
+        - `client_secret` (required unless certificate auth is used)
+        - `certificate_path` (required for certificate auth)
+        - `certificate_thumbprint` (required for certificate auth)
+
     ```json
     {
+          "auth_method": "authorization_code",
+          "client_id": "client-id",
+          "client_secret": "client-secret",
+          "redirect_uri": "https://my_redirect_uri",
+          "refresh_token": "refresh-token",
+          "organization_uri": "https://my_organization.crm.dynamics.com",
         "start_date": "2019-01-01T00:00:00Z",
         "user_agent": "tap-ms-dynamics-365-crm <api_user_email@your_company.com>",
         "request_timeout": 300,
