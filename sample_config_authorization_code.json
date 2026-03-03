@@ -4,8 +4,6 @@
   "client_secret": "client_secret",
   "refresh_token": "my_refresh_token",
   "organization_uri": "https://my_organization.crm.dynamics.com",
-  "tenant_id": "my_tenant_id",
-  "redirect_uri": "https://my_redirect_uri",
   "user_agent": "Tap MS Dynamics 365 CRM",
   "start_date": "2025-01-01T00:00:00Z",
   "page_size": 100

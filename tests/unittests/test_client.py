@@ -223,6 +223,15 @@ class TestClient(unittest.TestCase):
             client.check_api_credentials()
         self.assertIn("organization_uri", str(e.exception))
 
+    def test_client_initialization_invalid_auth_method_type(self):
+        invalid_config = default_config.copy()
+        invalid_config["auth_method"] = 123
+
+        with self.assertRaises(ValueError) as e:
+            Client(config_path="config.json", config=invalid_config)
+
+        self.assertIn("Invalid auth_method type", str(e.exception))
+
     def test_check_api_credentials_requires_tenant_for_client_credentials(self):
         invalid_config = default_config.copy()
         invalid_config["auth_method"] = AUTH_METHOD_CLIENT_CREDENTIALS
@@ -234,7 +243,7 @@ class TestClient(unittest.TestCase):
 
         self.assertIn("tenant_id is required", str(e.exception))
 
-    def test_check_api_credentials_requires_secret_or_certificate_for_client_credentials(self):
+    def test_check_api_credentials_requires_secret_for_client_credentials(self):
         invalid_config = default_config.copy()
         invalid_config["auth_method"] = AUTH_METHOD_CLIENT_CREDENTIALS
         invalid_config["tenant_id"] = "tenant-id"
@@ -257,7 +266,7 @@ class TestClient(unittest.TestCase):
         # Should not raise because client_secret + tenant_id are enough
         client.check_api_credentials()
 
-    def test_check_api_credentials_auth_code_requires_refresh_and_redirect(self):
+    def test_check_api_credentials_auth_code_requires_refresh_token(self):
         invalid_config = default_config.copy()
         invalid_config["auth_method"] = AUTH_METHOD_AUTHORIZATION_CODE
         invalid_config["refresh_token"] = ""

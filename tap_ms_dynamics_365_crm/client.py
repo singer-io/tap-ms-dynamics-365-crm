@@ -138,7 +138,16 @@ class Client:
         self.organization_uri = config.get("organization_uri")
         self.client_id = config.get("client_id")
         self.client_secret = config.get("client_secret")
-        self.auth_method = (config.get("auth_method") or AUTH_METHOD_AUTHORIZATION_CODE).strip().lower()
+        raw_auth_method = config.get("auth_method")
+        if raw_auth_method is None or raw_auth_method == "":
+            self.auth_method = AUTH_METHOD_AUTHORIZATION_CODE
+        elif not isinstance(raw_auth_method, str):
+            raise ValueError(
+                "Invalid auth_method type: expected string, "
+                f"got {type(raw_auth_method).__name__}."
+            )
+        else:
+            self.auth_method = raw_auth_method.strip().lower()
         self.tenant_id = config.get("tenant_id")
         self.refresh_token = config.get("refresh_token")
         self.api_version = API_VERSION

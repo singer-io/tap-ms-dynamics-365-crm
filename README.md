@@ -22,13 +22,13 @@ This tap:
 The tap supports two authentication flows:
 
 - `authorization_code` (existing behavior)
-    - Requires: `client_id`, `client_secret`, `redirect_uri`, `refresh_token`
+    - Requires: `client_id`, `client_secret`, `refresh_token`
 - `client_credentials` (app-only)
     - Requires: `client_id`, `tenant_id`, `client_secret`
 
 Notes:
 - `auth_method` defaults to `authorization_code` if omitted.
-- `refresh_token` and `redirect_uri` are only required for `authorization_code`.
+- `refresh_token` is only required for `authorization_code`.
 - For `client_credentials`, tokens are cached in memory and renewed on expiry.
 
 ## Quick Start
@@ -71,6 +71,11 @@ Notes:
     - `client_credentials`:
         - `tenant_id` (required)
         - `client_secret` (required)
+
+    Sample config files in this repo:
+    - `sample_config_authorization_code.json` (authorization_code)
+    - `sample_config_client_credentials.json` (client_credentials)
+    - `sample_config.json` (authorization_code example)
 
     ```json
     {
