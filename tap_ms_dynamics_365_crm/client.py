@@ -1,6 +1,5 @@
 import sys
 import math
-import os
 from typing import Any, Dict, Mapping, Optional, Tuple
 from datetime import datetime, timedelta
 import json
@@ -141,10 +140,7 @@ class Client:
         self.client_secret = config.get("client_secret")
         self.auth_method = (config.get("auth_method") or AUTH_METHOD_AUTHORIZATION_CODE).strip().lower()
         self.tenant_id = config.get("tenant_id")
-        self.redirect_uri = config.get("redirect_uri")
         self.refresh_token = config.get("refresh_token")
-        self.certificate_path = config.get("certificate_path")
-        self.certificate_thumbprint = config.get("certificate_thumbprint")
         self.api_version = API_VERSION
         self.max_pagesize = config.get("max_pagesize", MAX_PAGESIZE)
         self.start_date = config.get("start_date")
@@ -203,10 +199,6 @@ class Client:
                 raise ValueError(
                     "client_secret is required when auth_method is authorization_code"
                 )
-            if not self.redirect_uri:
-                raise ValueError(
-                    "redirect_uri is required when auth_method is authorization_code"
-                )
             if not self.refresh_token:
                 raise ValueError(
                     "refresh_token is required when auth_method is authorization_code"
@@ -218,20 +210,9 @@ class Client:
                     "tenant_id is required when auth_method is client_credentials"
                 )
 
-            has_client_secret = bool(self.client_secret)
-            has_any_certificate_config = bool(self.certificate_path or self.certificate_thumbprint)
-            has_certificate_config = bool(self.certificate_path and self.certificate_thumbprint)
-
-            if has_any_certificate_config and not has_certificate_config:
+            if not self.client_secret:
                 raise ValueError(
-                    "Both certificate_path and certificate_thumbprint are required for certificate "
-                    "authentication with client_credentials"
-                )
-
-            if not has_client_secret and not has_certificate_config:
-                raise ValueError(
-                    "client_credentials authentication requires either client_secret or "
-                    "certificate_path + certificate_thumbprint"
+                    "client_secret is required when auth_method is client_credentials"
                 )
 
     def _write_config(self, refresh_token):
@@ -257,7 +238,6 @@ class Client:
             data={
                 'client_id': self.client_id,
                 'client_secret': self.client_secret,
-                'redirect_uri': self.redirect_uri,
                 'refresh_token': self.refresh_token,
                 'grant_type': 'refresh_token',
                 'resource': self.organization_uri
@@ -283,27 +263,6 @@ class Client:
         organization_uri = self.organization_uri.rstrip("/")
         return f"{organization_uri}/.default"
 
-    def _build_client_credential(self):
-        if self.certificate_path and self.certificate_thumbprint:
-            if not os.path.exists(self.certificate_path):
-                raise MSDynamics365CrmError(
-                    f"Certificate file not found at certificate_path: {self.certificate_path}"
-                )
-            try:
-                with open(self.certificate_path, 'r', encoding='utf-8') as cert_file:
-                    private_key = cert_file.read()
-            except Exception as exc:
-                raise MSDynamics365CrmError(
-                    f"Failed to read certificate file at {self.certificate_path}: {exc}"
-                ) from exc
-
-            return {
-                "private_key": private_key,
-                "thumbprint": self.certificate_thumbprint
-            }
-
-        return self.client_secret
-
     def _acquire_access_token_client_credentials(self) -> None:
         """Acquires access token using OAuth client credentials flow."""
         LOGGER.info("Acquiring Access Token with client_credentials flow")
@@ -312,7 +271,7 @@ class Client:
         app = msal.ConfidentialClientApplication(
             self.client_id,
             authority=authority,
-            client_credential=self._build_client_credential()
+            client_credential=self.client_secret
         )
 
         result = app.acquire_token_for_client(scopes=[self._client_credentials_scope()])

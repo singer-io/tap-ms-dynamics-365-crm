@@ -6,8 +6,6 @@
   "organization_uri": "https://my_organization.crm.dynamics.com",
   "tenant_id": "my_tenant_id",
   "redirect_uri": "https://my_redirect_uri",
-  "certificate_path": "/path/to/private_key.pem",
-  "certificate_thumbprint": "my_certificate_thumbprint",
   "user_agent": "Tap MS Dynamics 365 CRM",
   "start_date": "2025-01-01T00:00:00Z",
   "page_size": 100

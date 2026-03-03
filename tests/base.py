@@ -63,10 +63,7 @@ class MSDynamics365CRMBaseTest(BaseCase):
             'client_secret': 'TAP_MS_DYNAMICS_365_CRM_CLIENT_SECRET',
             'organization_uri': 'TAP_MS_DYNAMICS_365_CRM_ORGANIZATION_URI',
             'tenant_id': 'TAP_MS_DYNAMICS_365_CRM_TENANT_ID',
-            'redirect_uri': 'TAP_MS_DYNAMICS_365_CRM_REDIRECT_URI',
             'refresh_token': 'TAP_MS_DYNAMICS_365_CRM_REFRESH_TOKEN',
-            'certificate_path': 'TAP_MS_DYNAMICS_365_CRM_CERTIFICATE_PATH',
-            'certificate_thumbprint': 'TAP_MS_DYNAMICS_365_CRM_CERTIFICATE_THUMBPRINT',
         }
 
         for cred in creds:

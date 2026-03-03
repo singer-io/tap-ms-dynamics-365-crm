@@ -239,14 +239,12 @@ class TestClient(unittest.TestCase):
         invalid_config["auth_method"] = AUTH_METHOD_CLIENT_CREDENTIALS
         invalid_config["tenant_id"] = "tenant-id"
         invalid_config["client_secret"] = ""
-        invalid_config["certificate_path"] = ""
-        invalid_config["certificate_thumbprint"] = ""
         client = Client(config_path="config.json", config=invalid_config)
 
         with self.assertRaises(ValueError) as e:
             client.check_api_credentials()
 
-        self.assertIn("requires either client_secret", str(e.exception))
+        self.assertIn("client_secret is required", str(e.exception))
 
     def test_check_api_credentials_client_credentials_with_secret(self):
         valid_config = default_config.copy()
@@ -300,8 +298,6 @@ class TestClient(unittest.TestCase):
         self.client.auth_method = AUTH_METHOD_CLIENT_CREDENTIALS
         self.client.tenant_id = "tenant-id"
         self.client.client_secret = "secret"
-        self.client.certificate_path = ""
-        self.client.certificate_thumbprint = ""
 
         mock_app = Mock()
         mock_app.acquire_token_for_client.return_value = {"access_token": "token", "expires_in": 3600}
@@ -317,38 +313,10 @@ class TestClient(unittest.TestCase):
             scopes=[self.client._client_credentials_scope()]
         )
 
-    @patch("tap_ms_dynamics_365_crm.client.os.path.exists", return_value=True)
-    @patch("tap_ms_dynamics_365_crm.client.open", create=True)
-    def test_acquire_access_token_client_credentials_with_certificate(self, mock_file_open, mock_exists):
-        self.client.auth_method = AUTH_METHOD_CLIENT_CREDENTIALS
-        self.client.tenant_id = "tenant-id"
-        self.client.client_secret = ""
-        self.client.certificate_path = "cert.pem"
-        self.client.certificate_thumbprint = "00112233445566778899AABBCCDDEEFF00112233"
-        mock_file_open.return_value.__enter__.return_value.read.return_value = "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----"
-
-        mock_app = Mock()
-        mock_app.acquire_token_for_client.return_value = {"access_token": "token", "expires_in": 3600}
-        with patch("tap_ms_dynamics_365_crm.client.msal.ConfidentialClientApplication", return_value=mock_app) as mock_cc_app:
-            self.client._acquire_access_token_client_credentials()
-
-        self.assertEqual(self.client._access_token, "token")
-        call_kwargs = mock_cc_app.call_args.kwargs
-        self.assertIsInstance(call_kwargs["client_credential"], dict)
-        self.assertEqual(call_kwargs["client_credential"]["thumbprint"], self.client.certificate_thumbprint)
-        self.assertIn("private_key", call_kwargs["client_credential"])
-        mock_app.acquire_token_for_client.assert_called_once_with(
-            scopes=[self.client._client_credentials_scope()]
-        )
-        mock_exists.assert_called_once()
-        mock_file_open.assert_called_once()
-
     def test_acquire_access_token_client_credentials_failure_message(self):
         self.client.auth_method = AUTH_METHOD_CLIENT_CREDENTIALS
         self.client.tenant_id = "tenant-id"
         self.client.client_secret = "secret"
-        self.client.certificate_path = ""
-        self.client.certificate_thumbprint = ""
 
         mock_app = Mock()
         mock_app.acquire_token_for_client.return_value = {

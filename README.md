@@ -24,9 +24,7 @@ The tap supports two authentication flows:
 - `authorization_code` (existing behavior)
     - Requires: `client_id`, `client_secret`, `redirect_uri`, `refresh_token`
 - `client_credentials` (app-only)
-    - Requires: `client_id`, `tenant_id`, and either:
-        - `client_secret`, or
-        - `certificate_path` + `certificate_thumbprint`
+    - Requires: `client_id`, `tenant_id`, `client_secret`
 
 Notes:
 - `auth_method` defaults to `authorization_code` if omitted.
@@ -69,22 +67,18 @@ Notes:
     Additional fields by auth method:
     - `authorization_code`:
         - `client_secret` (required)
-        - `redirect_uri` (required)
         - `refresh_token` (required)
     - `client_credentials`:
         - `tenant_id` (required)
-        - `client_secret` (required unless certificate auth is used)
-        - `certificate_path` (required for certificate auth)
-        - `certificate_thumbprint` (required for certificate auth)
+        - `client_secret` (required)
 
     ```json
     {
-          "auth_method": "authorization_code",
-          "client_id": "client-id",
-          "client_secret": "client-secret",
-          "redirect_uri": "https://my_redirect_uri",
-          "refresh_token": "refresh-token",
-          "organization_uri": "https://my_organization.crm.dynamics.com",
+        "auth_method": "authorization_code",
+        "client_id": "client-id",
+        "client_secret": "client-secret",
+        "refresh_token": "refresh-token",
+        "organization_uri": "https://my_organization.crm.dynamics.com",
         "start_date": "2019-01-01T00:00:00Z",
         "user_agent": "tap-ms-dynamics-365-crm <api_user_email@your_company.com>",
         "request_timeout": 300,
