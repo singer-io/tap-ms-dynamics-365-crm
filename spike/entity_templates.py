@@ -75,31 +75,104 @@ ENTITY_TEMPLATES = {
     'contract': {
         'title': lambda f: f"Contract - {f.company()}",
         'contractnumber': lambda f: f"CNT-{random.randint(1000, 9999)}",
-        'billingfrequencycode': lambda f: 1
+        'billingfrequencycode': lambda f: 1,
+        'activeon': lambda f: datetime.now().isoformat(),
+        'expireson': lambda f: (datetime.now() + timedelta(days=365)).isoformat()
+    },
+    'contractdetail': {
+        'title': lambda f: f"Contract Line - {f.word().title()}",
+        'activeon': lambda f: datetime.now().isoformat(),
+        'expireson': lambda f: (datetime.now() + timedelta(days=365)).isoformat(),
+        'lineitemorder': lambda f: random.randint(1, 20)
+    },
+    'contracttemplate': {
+        'name': lambda f: f"Template - {f.word().title()}",
+        'abbreviation': lambda f: f"CT{random.randint(100, 999)}",
+        'billingfrequencycode': lambda f: 1,
+        'allotmenttypecode': lambda f: 1
     },
     'entitlement': {
         'name': lambda f: f"Entitlement - {f.word().title()}",
-        'allocationtypecode': lambda f: 1
+        'allocationtypecode': lambda f: 1,
+        'startdate': lambda f: datetime.now().isoformat(),
+        'enddate': lambda f: (datetime.now() + timedelta(days=180)).isoformat()
+    },
+    'entitlemententityallocationtypemapping': {
+        'name': lambda f: f"Entitlement Allocation - {f.word().title()}",
+        'entitytype': lambda f: 112,
+        'allocationtype': lambda f: 1
     },
     'knowledgearticle': {
         'title': lambda f: f.sentence(nb_words=6),
         'articlepublicnumber': lambda f: f"KB{random.randint(1000, 9999)}"
     },
+    'knowledgearticleincident': {
+        'knowledgeusage': lambda f: random.randint(1, 3),
+        'issenttocustomer': lambda f: random.choice([True, False])
+    },
+    'knowledgearticleviews': {
+        'knowledgearticleview': lambda f: random.randint(1, 10),
+        'viewdate': lambda f: datetime.now().isoformat(),
+        'location': lambda f: random.randint(1, 3)
+    },
+    'knowledgebaserecord': {
+        'title': lambda f: f.sentence(nb_words=6),
+        'publicurl': lambda f: f.url(),
+        'privateurl': lambda f: f.url()
+    },
     'queue': {
         'name': lambda f: f"{f.word().title()} Support Queue",
         'queueviewtype': lambda f: 0
+    },
+    'feedback': {
+        'title': lambda f: f"Feedback - {f.word().title()}",
+        'comments': lambda f: f.text(max_nb_chars=150),
+        'rating': lambda f: random.randint(1, 5),
+        'minrating': lambda f: 1,
+        'maxrating': lambda f: 5
+    },
+    'incidentresolution': {
+        'category': lambda f: f.word().title(),
+        'subcategory': lambda f: f.word().title(),
+        'timespent': lambda f: random.randint(5, 120),
+        'resolutiontypecode': lambda f: 5
     },
     'serviceappointment': {
         'subject': lambda f: f"Service - {f.bs().title()}",
         'scheduledstart': lambda f: (datetime.now() + timedelta(days=1)).isoformat(),
         'scheduledend': lambda f: (datetime.now() + timedelta(days=1, hours=2)).isoformat()
     },
+    'invoicedetail': {
+        'invoicedetailname': lambda f: f"Invoice Line - {f.word().title()}",
+        'description': lambda f: f.sentence(nb_words=8),
+        'quantity': lambda f: round(random.uniform(1, 20), 2),
+        'priceperunit': lambda f: round(random.uniform(10, 500), 2)
+    },
     'equipment': {
-        'name': lambda f: f"Equipment - {f.word().title()}"
+        'name': lambda f: f"Equipment - {f.word().title()}",
+        'description': lambda f: f.text(max_nb_chars=100)
     },
     'bookableresource': {
         'name': lambda f: f"{f.first_name()} {f.last_name()}",
-        'resourcetype': lambda f: 3
+        'resourcetype': lambda f: 5,
+        'msdyn_primaryemail': lambda f: f.email()
+    },
+    'bookableresourcebooking': {
+        'name': lambda f: f"Booking - {f.word().title()}",
+        'starttime': lambda f: (datetime.now() + timedelta(days=1)).isoformat(),
+        'endtime': lambda f: (datetime.now() + timedelta(days=1, hours=2)).isoformat(),
+        'duration': lambda f: 120
+    },
+    'bookableresourcebookingheader': {
+        'name': lambda f: f"Booking Header - {f.word().title()}",
+        'starttime': lambda f: (datetime.now() + timedelta(days=1)).isoformat(),
+        'endtime': lambda f: (datetime.now() + timedelta(days=1, hours=2)).isoformat(),
+        'duration': lambda f: 120
+    },
+    'bookableresourcegroup': {
+        'name': lambda f: f"Resource Group - {f.word().title()}",
+        'fromdate': lambda f: datetime.now().isoformat(),
+        'todate': lambda f: (datetime.now() + timedelta(days=30)).isoformat()
     },
 
     # ===== FIELD SERVICE ENTITIES =====
@@ -110,7 +183,9 @@ ENTITY_TEMPLATES = {
     },
     'msdyn_agreement': {
         'msdyn_name': lambda f: f"Agreement - {f.company()}",
-        'msdyn_systemstatus': lambda f: 690970000
+        'msdyn_systemstatus': lambda f: 690970000,
+        'msdyn_startdate': lambda f: datetime.now().isoformat(),
+        'msdyn_enddate': lambda f: (datetime.now() + timedelta(days=365)).isoformat()
     },
     'msdyn_actual': {
         'msdyn_description': lambda f: f.text(max_nb_chars=100),
