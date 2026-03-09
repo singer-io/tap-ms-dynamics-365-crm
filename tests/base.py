@@ -1663,8 +1663,6 @@ class MSDynamics365CRMBaseTest(BaseCase):
             "start_date": "2022-07-01T00:00:00Z",
             "page_size": 100
         }
-        if original:
-            return return_value
 
         return_value["start_date"] = self.start_date
         return return_value
