@@ -120,6 +120,13 @@ class MSDynamics365CRMStartDateTest(StartDateTest, MSDynamics365CRMBaseTest):
     def streams_to_test(self):
         return {self.test_stream}
 
+    def get_properties(self, original: bool = True):
+        """Configuration of properties required for the tap."""
+        return {
+            "start_date": self.start_date,
+            "page_size": 100
+        }
+
     @property
     def start_date_1(self):
         return self.start_date_1_value
