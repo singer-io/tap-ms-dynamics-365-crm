@@ -7,12 +7,10 @@ from tap_ms_dynamics_365_crm.sync import sync
 
 LOGGER = singer.get_logger()
 
+# Global minimum required configuration keys for the tap to run
 REQUIRED_CONFIG_KEYS = [
     'client_id',
-    'client_secret',
     'organization_uri',
-    'redirect_uri',
-    'refresh_token',
     'start_date'
 ]
 

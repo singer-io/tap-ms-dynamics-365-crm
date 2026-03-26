@@ -1,9 +1,16 @@
 import unittest
 import requests
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 from parameterized import parameterized
 from requests.exceptions import Timeout, ConnectionError, ChunkedEncodingError
-from tap_ms_dynamics_365_crm.client import Client, raise_for_error, retry_after_wait_gen
+from datetime import datetime, timedelta
+from tap_ms_dynamics_365_crm.client import (
+    Client,
+    raise_for_error,
+    retry_after_wait_gen,
+    AUTH_METHOD_CLIENT_CREDENTIALS,
+    AUTH_METHOD_AUTHORIZATION_CODE
+)
 from tap_ms_dynamics_365_crm.exceptions import *
 
 
@@ -12,9 +19,9 @@ default_config = {
     "request_timeout": 30,
     "client_id": "test_client",
     "client_secret": "test_secret",
+    "auth_method": "authorization_code",
     "redirect_uri": "http://localhost",
     "refresh_token": "test_refresh",
-    "api_version": "9.2",
     "max_pagesize": 5000,
     "start_date": "2024-01-01T00:00:00Z"
 }
@@ -215,3 +222,119 @@ class TestClient(unittest.TestCase):
         with self.assertRaises(ValueError) as e:
             client.check_api_credentials()
         self.assertIn("organization_uri", str(e.exception))
+
+    def test_client_initialization_invalid_auth_method_type(self):
+        invalid_config = default_config.copy()
+        invalid_config["auth_method"] = 123
+
+        with self.assertRaises(ValueError) as e:
+            Client(config_path="config.json", config=invalid_config)
+
+        self.assertIn("Invalid auth_method type", str(e.exception))
+
+    def test_check_api_credentials_requires_tenant_for_client_credentials(self):
+        invalid_config = default_config.copy()
+        invalid_config["auth_method"] = AUTH_METHOD_CLIENT_CREDENTIALS
+        invalid_config["tenant_id"] = ""
+        client = Client(config_path="config.json", config=invalid_config)
+
+        with self.assertRaises(ValueError) as e:
+            client.check_api_credentials()
+
+        self.assertIn("tenant_id is required", str(e.exception))
+
+    def test_check_api_credentials_requires_secret_for_client_credentials(self):
+        invalid_config = default_config.copy()
+        invalid_config["auth_method"] = AUTH_METHOD_CLIENT_CREDENTIALS
+        invalid_config["tenant_id"] = "tenant-id"
+        invalid_config["client_secret"] = ""
+        client = Client(config_path="config.json", config=invalid_config)
+
+        with self.assertRaises(ValueError) as e:
+            client.check_api_credentials()
+
+        self.assertIn("client_secret is required", str(e.exception))
+
+    def test_check_api_credentials_client_credentials_with_secret(self):
+        valid_config = default_config.copy()
+        valid_config["auth_method"] = AUTH_METHOD_CLIENT_CREDENTIALS
+        valid_config["tenant_id"] = "tenant-id"
+        valid_config["refresh_token"] = ""
+        valid_config["redirect_uri"] = ""
+        client = Client(config_path="config.json", config=valid_config)
+
+        # Should not raise because client_secret + tenant_id are enough
+        client.check_api_credentials()
+
+    def test_check_api_credentials_auth_code_requires_refresh_token(self):
+        invalid_config = default_config.copy()
+        invalid_config["auth_method"] = AUTH_METHOD_AUTHORIZATION_CODE
+        invalid_config["refresh_token"] = ""
+        client = Client(config_path="config.json", config=invalid_config)
+
+        with self.assertRaises(ValueError) as e:
+            client.check_api_credentials()
+
+        self.assertIn("refresh_token is required", str(e.exception))
+
+    def test_get_access_token_uses_client_credentials_when_selected(self):
+        self.client.auth_method = AUTH_METHOD_CLIENT_CREDENTIALS
+        self.client._access_token = None
+        self.client._expires_at = None
+
+        with patch.object(self.client, "_acquire_access_token_client_credentials") as mock_client_credentials, \
+                patch.object(self.client, "_refresh_access_token") as mock_refresh:
+            mock_client_credentials.side_effect = lambda: setattr(self.client, "_access_token", "token")
+            token = self.client.get_access_token()
+
+        self.assertEqual(token, "token")
+        mock_client_credentials.assert_called_once()
+        mock_refresh.assert_not_called()
+
+    def test_get_access_token_uses_cached_token(self):
+        self.client._access_token = "cached-token"
+        self.client._expires_at = datetime.now() + timedelta(minutes=10)
+
+        with patch.object(self.client, "_acquire_access_token_client_credentials") as mock_client_credentials, \
+                patch.object(self.client, "_refresh_access_token") as mock_refresh:
+            token = self.client.get_access_token()
+
+        self.assertEqual(token, "cached-token")
+        mock_client_credentials.assert_not_called()
+        mock_refresh.assert_not_called()
+
+    def test_acquire_access_token_client_credentials_with_secret(self):
+        self.client.auth_method = AUTH_METHOD_CLIENT_CREDENTIALS
+        self.client.tenant_id = "tenant-id"
+        self.client.client_secret = "secret"
+
+        mock_app = Mock()
+        mock_app.acquire_token_for_client.return_value = {"access_token": "token", "expires_in": 3600}
+        with patch("tap_ms_dynamics_365_crm.client.msal.ConfidentialClientApplication", return_value=mock_app) as mock_cc_app:
+            self.client._acquire_access_token_client_credentials()
+
+        self.assertEqual(self.client._access_token, "token")
+        self.assertIsNotNone(self.client._expires_at)
+        mock_cc_app.assert_called_once()
+        call_kwargs = mock_cc_app.call_args.kwargs
+        self.assertEqual(call_kwargs["client_credential"], "secret")
+        mock_app.acquire_token_for_client.assert_called_once_with(
+            scopes=[self.client._client_credentials_scope()]
+        )
+
+    def test_acquire_access_token_client_credentials_failure_message(self):
+        self.client.auth_method = AUTH_METHOD_CLIENT_CREDENTIALS
+        self.client.tenant_id = "tenant-id"
+        self.client.client_secret = "secret"
+
+        mock_app = Mock()
+        mock_app.acquire_token_for_client.return_value = {
+                "error": "invalid_client",
+                "error_description": "AADSTS7000215: Invalid client secret is provided."
+            }
+        with patch("tap_ms_dynamics_365_crm.client.msal.ConfidentialClientApplication", return_value=mock_app):
+            with self.assertRaises(MSDynamics365CrmError) as exc:
+                self.client._acquire_access_token_client_credentials()
+
+        self.assertIn("invalid_client", str(exc.exception))
+        self.assertIn("Invalid client secret", str(exc.exception))

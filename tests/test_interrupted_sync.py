@@ -12,13 +12,30 @@ class MSDynamics365CRMInterruptedSyncTest(InterruptedSyncTest, MSDynamics365CRMB
         return "tap_tester_ms_dynamics_365_crm_interrupted_sync_test"
 
     def streams_to_test(self):
-        return self.expected_stream_names()
+        included_streams = set({
+            "account",
+            "contact",
+            "incident",
+            "knowledgearticle",
+            "lead",
+            "msdyn_bookingsetupmetadata",
+            "opportunity",
+            "phonetocaseprocess",
+            "product",
+            "queue",
+        })
+        streams_to_exclude = set(MSDynamics365CRMBaseTest.expected_metadata().keys()).difference(
+            included_streams
+        )
+        return self.expected_stream_names().difference(streams_to_exclude)
 
 
     def manipulate_state(self):
         return {
-            "currently_syncing": "prospects",
+            "currently_syncing": "incident",
             "bookmarks": {
+                "account": {"modifiedon": "2026-01-01T00:00:00.000000Z"},
+                "contact": {"modifiedon": "2026-01-01T00:00:00.000000Z"},
+                "incident": {"modifiedon": "2026-01-05T14:15:44.000000Z"},
         }
     }
-

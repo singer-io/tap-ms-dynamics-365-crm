@@ -6,9 +6,6 @@ from tap_tester import menagerie
 
 class MSDynamics365CRMDiscoveryTest(DiscoveryTest, MSDynamics365CRMBaseTest):
     """Test tap discovery mode and metadata conforms to standards."""
-    orphan_streams = {
-    }
-
     @staticmethod
     def name():
         return "tap_tester_ms_dynamics_365_crm_discovery_test"
@@ -44,14 +41,26 @@ class MSDynamics365CRMDiscoveryTest(DiscoveryTest, MSDynamics365CRMBaseTest):
                 self.assertIn("metadata", stream_properties[0])
                 stream_metadata = stream_properties[0]["metadata"]
 
-
-                if stream not in self.orphan_streams:
-                    self.assertIn(self.PARENT_TAP_STREAM_ID, stream_metadata)
-                    self.assertTrue(isinstance(actual_parent_tap_stream_id, str))
-
-
                 with self.subTest(msg="validating parent tap stream id"):
-                    self.assertEqual(expected_parent_tap_stream_id, actual_parent_tap_stream_id,
-                                        logging=f"verify {expected_parent_tap_stream_id} "
-                                                f"is saved in metadata as a parent-tap-stream-id")
-
+                    if expected_parent_tap_stream_id is None:
+                        # When no parent is expected, ensure the parent-tap-stream-id key is absent.
+                        self.assertNotIn(
+                            self.PARENT_TAP_STREAM_ID,
+                            stream_metadata,
+                            logging="verify no parent-tap-stream-id is saved in metadata "
+                                    "when none is expected",
+                        )
+                    else:
+                        # When a parent is expected, ensure the key exists and the value matches.
+                        self.assertIn(
+                            self.PARENT_TAP_STREAM_ID,
+                            stream_metadata,
+                            logging=f"verify {self.PARENT_TAP_STREAM_ID} "
+                                    f"key exists in stream-level metadata",
+                        )
+                        self.assertEqual(
+                            expected_parent_tap_stream_id,
+                            actual_parent_tap_stream_id,
+                            logging=f"verify {expected_parent_tap_stream_id} "
+                                    f"is saved in metadata as a parent-tap-stream-id",
+                        )

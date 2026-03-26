@@ -127,11 +127,16 @@ class BaseStream(ABC):
 
     def update_params(self, orderby_key: str = 'modifiedon',
                       replication_key: str = 'modifiedon',
-                      filter_value: str = None) -> None:
+                      filter_value: str = None,
+                      secondary_orderby_key: str = None) -> None:
         """
         Build and update OData query parameters for the stream
         """
-        orderby_param = f'{orderby_key} asc'
+        orderby_parts = [f'{orderby_key} asc']
+        if secondary_orderby_key and secondary_orderby_key != orderby_key:
+            orderby_parts.append(f'{secondary_orderby_key} asc')
+
+        orderby_param = ', '.join(orderby_parts)
 
         if filter_value:
             filter_param = f'{replication_key} ge {filter_value}'
@@ -188,7 +193,16 @@ class IncrementalStream(BaseStream):
         """Implementation for `type: Incremental` stream."""
         bookmark_date = self.get_bookmark(state, self.tap_stream_id)
         current_max_bookmark_date = bookmark_date
-        self.update_params(filter_value=bookmark_date)
+        secondary_orderby_key = None
+        if self.tap_stream_id == 'incident' and self.key_properties:
+            secondary_orderby_key = self.key_properties[0]
+
+        self.update_params(
+            orderby_key=self.replication_keys[0],
+            replication_key=self.replication_keys[0],
+            filter_value=bookmark_date,
+            secondary_orderby_key=secondary_orderby_key
+        )
         self.update_header(Prefer=f'odata.maxpagesize={self.page_size}')
         self.url_endpoint = self.get_url_endpoint(parent_obj)
 
