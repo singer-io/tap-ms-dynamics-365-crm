@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import json
 
 import backoff
+import msal
 import requests
 from requests import session
 from simplejson import JSONDecodeError
@@ -33,8 +34,11 @@ API_VERSION = "9.2"
 MAX_PAGESIZE = 5000
 MAX_RETRIES = 5
 REFRESH_URL = "https://login.microsoftonline.com/common/oauth2/token"
+CLIENT_CREDENTIALS_AUTHORITY_URL = "https://login.microsoftonline.com/{tenant_id}"
 DEFAULT_EXPIRY_TIME_IN_SECONDS = 3600
 USER_AGENT = "Singer Tap MS Dynamics 365 CRM"
+AUTH_METHOD_AUTHORIZATION_CODE = "authorization_code"
+AUTH_METHOD_CLIENT_CREDENTIALS = "client_credentials"
 
 def raise_for_error(response: requests.Response) -> None:
     """Raises the associated response exception. Takes in a response object,
@@ -134,7 +138,17 @@ class Client:
         self.organization_uri = config.get("organization_uri")
         self.client_id = config.get("client_id")
         self.client_secret = config.get("client_secret")
-        self.redirect_uri = config.get("redirect_uri")
+        raw_auth_method = config.get("auth_method")
+        if raw_auth_method is None or raw_auth_method == "":
+            self.auth_method = AUTH_METHOD_AUTHORIZATION_CODE
+        elif not isinstance(raw_auth_method, str):
+            raise ValueError(
+                "Invalid auth_method type: expected string, "
+                f"got {type(raw_auth_method).__name__}."
+            )
+        else:
+            self.auth_method = raw_auth_method.strip().lower()
+        self.tenant_id = config.get("tenant_id")
         self.refresh_token = config.get("refresh_token")
         self.api_version = API_VERSION
         self.max_pagesize = config.get("max_pagesize", MAX_PAGESIZE)
@@ -175,12 +189,40 @@ class Client:
         self._session.close()
 
     def check_api_credentials(self) -> None:
+        allowed_auth_methods = [AUTH_METHOD_AUTHORIZATION_CODE, AUTH_METHOD_CLIENT_CREDENTIALS]
+
         if not self.organization_uri:
             raise ValueError("organization_uri is required and cannot be null or empty")
-        if not self.api_version:
-            raise ValueError("api_version is required and cannot be null or empty")
+        if not self.client_id:
+            raise ValueError("client_id is required and cannot be null or empty")
         if self.request_timeout <= 0:
             raise ValueError("request_timeout must be greater than 0")
+        if self.auth_method not in allowed_auth_methods:
+            raise ValueError(
+                f"Invalid auth_method: '{self.auth_method}'. "
+                f"Supported values are: {AUTH_METHOD_AUTHORIZATION_CODE}, {AUTH_METHOD_CLIENT_CREDENTIALS}."
+            )
+
+        if self.auth_method == AUTH_METHOD_AUTHORIZATION_CODE:
+            if not self.client_secret:
+                raise ValueError(
+                    "client_secret is required when auth_method is authorization_code"
+                )
+            if not self.refresh_token:
+                raise ValueError(
+                    "refresh_token is required when auth_method is authorization_code"
+                )
+
+        if self.auth_method == AUTH_METHOD_CLIENT_CREDENTIALS:
+            if not self.tenant_id:
+                raise ValueError(
+                    "tenant_id is required when auth_method is client_credentials"
+                )
+
+            if not self.client_secret:
+                raise ValueError(
+                    "client_secret is required when auth_method is client_credentials"
+                )
 
     def _write_config(self, refresh_token):
         """Writes updated refresh token to config file."""
@@ -205,7 +247,6 @@ class Client:
             data={
                 'client_id': self.client_id,
                 'client_secret': self.client_secret,
-                'redirect_uri': self.redirect_uri,
                 'refresh_token': self.refresh_token,
                 'grant_type': 'refresh_token',
                 'resource': self.organization_uri
@@ -227,12 +268,45 @@ class Client:
         self._expires_at = datetime.now() + timedelta(seconds=int(expires_in_seconds) - 10)
         LOGGER.info("Got refreshed access token")
 
+    def _client_credentials_scope(self) -> str:
+        organization_uri = self.organization_uri.rstrip("/")
+        return f"{organization_uri}/.default"
+
+    def _acquire_access_token_client_credentials(self) -> None:
+        """Acquires access token using OAuth client credentials flow."""
+        LOGGER.info("Acquiring Access Token with client_credentials flow")
+
+        authority = CLIENT_CREDENTIALS_AUTHORITY_URL.format(tenant_id=self.tenant_id)
+        app = msal.ConfidentialClientApplication(
+            self.client_id,
+            authority=authority,
+            client_credential=self.client_secret
+        )
+
+        result = app.acquire_token_for_client(scopes=[self._client_credentials_scope()])
+        if "access_token" not in result:
+            error = result.get("error")
+            error_description = result.get("error_description")
+            correlation_id = result.get("correlation_id")
+            raise MSDynamics365CrmError(
+                "Failed to acquire access token using client_credentials. "
+                f"error={error}, description={error_description}, correlation_id={correlation_id}"
+            )
+
+        self._access_token = result["access_token"]
+        expires_in_seconds = result.get("expires_in", DEFAULT_EXPIRY_TIME_IN_SECONDS)
+        self._expires_at = datetime.now() + timedelta(seconds=int(expires_in_seconds) - 10)
+        LOGGER.info("Got access token using client_credentials flow")
+
     def get_access_token(self) -> str:
         """Return access token if available or generate one."""
-        if self._access_token and self._expires_at > datetime.now():
+        if self._access_token and self._expires_at and self._expires_at > datetime.now():
             return self._access_token
 
-        self._refresh_access_token()
+        if self.auth_method == AUTH_METHOD_CLIENT_CREDENTIALS:
+            self._acquire_access_token_client_credentials()
+        else:
+            self._refresh_access_token()
         return self._access_token
 
     def _get_standard_headers(self):
