@@ -11,7 +11,20 @@ from tap_ms_dynamics_365_crm.client import (
     AUTH_METHOD_CLIENT_CREDENTIALS,
     AUTH_METHOD_AUTHORIZATION_CODE
 )
-from tap_ms_dynamics_365_crm.exceptions import *
+from tap_ms_dynamics_365_crm.exceptions import (
+    MSDynamics365CrmError,
+    MSDynamics365CrmBadRequestError,
+    MSDynamics365CrmUnauthorizedError,
+    MSDynamics365CrmForbiddenError,
+    MSDynamics365CrmNotFoundError,
+    MSDynamics365CrmConflictError,
+    MSDynamics365CrmUnprocessableEntityError,
+    MSDynamics365CrmInternalServerError,
+    MSDynamics365CrmNotImplementedError,
+    MSDynamics365CrmBadGatewayError,
+    MSDynamics365CrmServiceUnavailableError,
+    MSDynamics365CrmRateLimitError,
+)
 
 
 default_config = {
@@ -32,15 +45,15 @@ class MockResponse:
     """Mocked standard HTTPResponse to test error handling."""
 
     def __init__(
-        self, status_code, resp="", content=[""], headers=None, raise_error=True, text={}, json_data=None
+        self, status_code, resp="", content=None, headers=None, raise_error=True, text=None, json_data=None
     ):
         self.json_data = resp
         self.status_code = status_code
-        self.content = content
+        self.content = content if content is not None else [""]
         self.headers = headers or {}
         self.raise_error = raise_error
-        self.text = text
-        self._json_data = json_data if json_data is not None else text
+        self.text = text if text is not None else {}
+        self._json_data = json_data if json_data is not None else self.text
         self.reason = "error"
 
     def raise_for_status(self):

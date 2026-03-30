@@ -59,7 +59,7 @@ def call_entity_definitions(client: Client):
 
     LOGGER.info('MS Dynamics returned total {} entities'.format(results.get("@odata.count")))
 
-    yield from results.get('value')
+    yield from results.get('value', [])
 
 def build_entity_metadata(client: Client, included_entities: dict):
     """Builds entity metadata from the `$metadata` endpoints."""

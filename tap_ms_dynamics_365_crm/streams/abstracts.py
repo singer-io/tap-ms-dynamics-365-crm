@@ -161,26 +161,42 @@ class IncrementalStream(BaseStream):
     """Base Class for Incremental Stream."""
     replication_method = "INCREMENTAL"
 
+    def _resolve_replication_key(self, key: Any = None) -> str:
+        """Return key if provided, otherwise fall back to replication_keys[0].
+
+        Raises:
+            ValueError: If key is not provided and replication_keys is empty.
+        """
+        if key:
+            return key
+        if not self.replication_keys:
+            raise ValueError(
+                f"Stream '{self.tap_stream_id}' is misconfigured: "
+                "'replication_keys' must not be empty for an INCREMENTAL stream."
+            )
+        return self.replication_keys[0]
+
     def get_bookmark(self, state: dict, stream: str, key: Any = None) -> int:
         """A wrapper for singer.get_bookmark to deal with compatibility for
         bookmark values or start values."""
         return get_bookmark(
             state,
             stream,
-            key or self.replication_keys[0],
+            self._resolve_replication_key(key),
             self.client.config["start_date"],
         )
 
     def write_bookmark(self, state: dict, stream: str, key: Any = None, value: Any = None) -> Dict:
-        """A wrapper for singer.get_bookmark to deal with compatibility for
+        """A wrapper for singer.write_bookmark to deal with compatibility for
         bookmark values or start values."""
-        if not (key or self.replication_keys[0]):
+        resolved_key = self._resolve_replication_key(key)
+        if not resolved_key:
             return state
 
-        current_bookmark = get_bookmark(state, stream, key or self.replication_keys[0], self.client.config["start_date"])
+        current_bookmark = get_bookmark(state, stream, resolved_key, self.client.config["start_date"])
         value = max(current_bookmark, value)
         return write_bookmark(
-            state, stream, key or self.replication_keys[0], value
+            state, stream, resolved_key, value
         )
 
 
