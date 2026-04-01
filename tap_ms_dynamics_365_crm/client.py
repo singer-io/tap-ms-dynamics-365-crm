@@ -16,7 +16,6 @@ from requests.exceptions import (
 )
 from singer import get_logger, metrics
 
-from tap_ms_dynamics_365_crm.xml_transformer import transform_metadata_xml
 from tap_ms_dynamics_365_crm.exceptions import (
     ERROR_CODE_EXCEPTION_MAPPING,
     MSDynamics365CrmError,
@@ -91,12 +90,11 @@ def retry_after_wait_gen():
     Generator function to retrieve 'Retry-After' header from the exception response and
     sleep for the specified time.
     This is used in the backoff decorator to handle rate limiting (HTTP 429) errors.
-    The generator runs indefinitely - the backoff decorator controls when to stop via max_tries.
+    Yields up to MAX_RETRIES times; the backoff decorator also enforces max_tries independently.
     """
     DEFAULT_WAIT_TIME = 60
 
-    # Generator yields indefinitely; backoff decorator controls termination via max_tries
-    while True:
+    for _ in range(MAX_RETRIES):
         exc_info = sys.exc_info()
         sleep_time = DEFAULT_WAIT_TIME
 

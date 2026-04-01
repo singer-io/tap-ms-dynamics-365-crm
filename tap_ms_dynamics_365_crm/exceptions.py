@@ -55,50 +55,51 @@ class MSDynamics365CrmServiceUnavailableError(MSDynamics365CrmBackoffError):
     """class representing 503 status code."""
     pass
 
+# MS Dynamics 365 Web API HTTP status code reference:
+# https://learn.microsoft.com/en-us/power-apps/developer/data-platform/webapi/compose-http-requests-handle-errors
 ERROR_CODE_EXCEPTION_MAPPING = {
     400: {
         "raise_exception": MSDynamics365CrmBadRequestError,
-        "message": "A validation exception has occurred."
+        "message": "Bad request. The request URL or body is invalid or malformed."
     },
     401: {
         "raise_exception": MSDynamics365CrmUnauthorizedError,
-        "message": "The access token provided is expired, revoked, malformed or invalid for other reasons."
+        "message": "Unauthorized. The access token is missing, expired, or invalid."
     },
     403: {
         "raise_exception": MSDynamics365CrmForbiddenError,
-        "message": "You are missing the following required scopes: read"
+        "message": "Forbidden. The user does not have the required Dataverse security role or privilege to perform this operation."
     },
     404: {
         "raise_exception": MSDynamics365CrmNotFoundError,
-        "message": "The resource you have specified cannot be found."
+        "message": "Not found. The requested resource or entity record does not exist."
     },
     409: {
         "raise_exception": MSDynamics365CrmConflictError,
-        "message": "The API request cannot be completed because the requested operation would conflict with an existing item."
+        "message": "Conflict. The operation conflicts with an existing record (duplicate detection or concurrency violation)."
     },
     422: {
         "raise_exception": MSDynamics365CrmUnprocessableEntityError,
-        "message": "The request content itself is not processable by the server."
+        "message": "Unprocessable entity. The request was well-formed but could not be processed."
     },
     429: {
         "raise_exception": MSDynamics365CrmRateLimitError,
-        "message": "The API rate limit for your organisation/application pairing has been exceeded."
+        "message": "Too many requests. Service Protection API limits exceeded. Retry after the period indicated in the Retry-After header."
     },
     500: {
         "raise_exception": MSDynamics365CrmInternalServerError,
-        "message": "The server encountered an unexpected condition which prevented" \
-            " it from fulfilling the request."
+        "message": "Internal server error. The server encountered an unexpected condition which prevented it from fulfilling the request."
     },
     501: {
         "raise_exception": MSDynamics365CrmNotImplementedError,
-        "message": "The server does not support the functionality required to fulfill the request."
+        "message": "Not implemented. The server does not support the functionality required to fulfill the request."
     },
     502: {
         "raise_exception": MSDynamics365CrmBadGatewayError,
-        "message": "Server received an invalid response."
+        "message": "Bad gateway. An upstream proxy or load balancer received an invalid response from the MS Dynamics server."
     },
     503: {
         "raise_exception": MSDynamics365CrmServiceUnavailableError,
-        "message": "API service is currently unavailable."
+        "message": "Service unavailable. The MS Dynamics 365 API service is temporarily unavailable. Retry after a short delay."
     }
 }

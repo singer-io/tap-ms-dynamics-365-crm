@@ -133,6 +133,11 @@ class BaseStream(ABC):
         Build and update OData query parameters for the stream
         """
         orderby_parts = [f'{orderby_key} asc']
+        # Secondary sort is appended only when it differs from the primary key.
+        # This ensures a stable, deterministic page order when multiple records share
+        # the same primary sort value (e.g. two records modified at the same millisecond).
+        # Without a tiebreaker, the MS Dynamics OData paging cursor ($skiptoken) can return
+        # duplicate or skipped records across pages.
         if secondary_orderby_key and secondary_orderby_key != orderby_key:
             orderby_parts.append(f'{secondary_orderby_key} asc')
 
@@ -210,6 +215,10 @@ class IncrementalStream(BaseStream):
         bookmark_date = self.get_bookmark(state, self.tap_stream_id)
         current_max_bookmark_date = bookmark_date
         secondary_orderby_key = None
+        # `incident` records frequently share identical `modifiedon` timestamps due to
+        # bulk updates (case merges, SLA recalculations, workflow triggers). Adding the
+        # primary key as a secondary sort ensures a stable page order and prevents the
+        # OData $skiptoken cursor from skipping or duplicating records at page boundaries.
         if self.tap_stream_id == 'incident' and self.key_properties:
             secondary_orderby_key = self.key_properties[0]
 

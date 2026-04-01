@@ -14,7 +14,19 @@ This tap:
 
 ## Streams
 
+Streams are **dynamically discovered** at runtime by querying the MS Dynamics 365 `EntityDefinitions` and `$metadata` endpoints. The set of available streams depends on which modules and entities are enabled in your MS Dynamics 365 organisation.
 
+The tap covers three module categories. Each entity maps to one Singer stream, named after its OData `LogicalName`:
+
+| Module | MS Dynamics 365 Docs |
+|---|---|
+| **Sales** | [Sales entities reference](https://learn.microsoft.com/en-us/dynamics365/sales/developer/entities/entities-overview) |
+| **Field Service** | [Field Service entities reference](https://learn.microsoft.com/en-us/dynamics365/field-service/developer/reference/entities/entities-overview) |
+| **Customer Service** | [Customer Service entities reference](https://learn.microsoft.com/en-us/dynamics365/customer-service/developer/reference/entities/entities-overview) |
+
+**Replication strategy** is also determined dynamically:
+- Streams with a `modifiedon` field → `INCREMENTAL` (bookmarked on `modifiedon`)
+- Streams without `modifiedon` → `FULL_TABLE`
 
 
 ## Authentication
@@ -160,6 +172,26 @@ Notes:
     ```
     pip install -e .'[dev]'
     ```
+
+---
+
+## Test Data (`spike/`)
+
+The `spike/` directory contains a standalone test data generator for creating realistic MS Dynamics 365 CRM records against a live environment. It is intended for integration testing and local development only — it is **not** part of the tap itself.
+
+| File | Purpose |
+|---|---|
+| `create_test_data_comprehensive.py` | CLI script to create/clean up test records |
+| `entity_templates.py` | Field definitions and data generators for each entity type |
+| `TEST_DATA_README.md` | Full usage instructions for the data generator |
+
+**Prerequisites:**
+```bash
+pip install faker
+```
+
+See [spike/TEST_DATA_README.md](spike/TEST_DATA_README.md) for full usage instructions.
+
 ---
 
 Copyright &copy; 2019 Stitch
