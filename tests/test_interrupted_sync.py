@@ -29,6 +29,12 @@ class MSDynamics365CRMInterruptedSyncTest(InterruptedSyncTest, MSDynamics365CRMB
         )
         return self.expected_stream_names().difference(streams_to_exclude)
 
+    def get_properties(self, original: bool = True):
+        """Configuration of properties required for the tap."""
+        return {
+            "start_date": self.start_date,
+            "page_size": 100
+        }
 
     def manipulate_state(self):
         return {
@@ -37,5 +43,5 @@ class MSDynamics365CRMInterruptedSyncTest(InterruptedSyncTest, MSDynamics365CRMB
                 "account": {"modifiedon": "2026-01-01T00:00:00.000000Z"},
                 "contact": {"modifiedon": "2026-01-01T00:00:00.000000Z"},
                 "incident": {"modifiedon": "2026-01-05T14:15:44.000000Z"},
+            }
         }
-    }
