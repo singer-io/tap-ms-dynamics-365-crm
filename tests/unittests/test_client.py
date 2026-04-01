@@ -101,11 +101,11 @@ class TestClient(unittest.TestCase):
             assert isinstance(client._session, mock_session().__class__)
 
     @parameterized.expand([
-        ["400 error", 400, MSDynamics365CrmBadRequestError, "A validation exception has occurred."],
-        ["401 error", 401, MSDynamics365CrmUnauthorizedError, "The access token provided is expired, revoked, malformed or invalid for other reasons."],
-        ["403 error", 403, MSDynamics365CrmForbiddenError, "You are missing the following required scopes: read"],
-        ["404 error", 404, MSDynamics365CrmNotFoundError, "The resource you have specified cannot be found."],
-        ["409 error", 409, MSDynamics365CrmConflictError, "The API request cannot be completed because the requested operation would conflict with an existing item."],
+        ["400 error", 400, MSDynamics365CrmBadRequestError, "Bad request. The request URL or body is invalid or malformed."],
+        ["401 error", 401, MSDynamics365CrmUnauthorizedError, "Unauthorized. The access token is missing, expired, or invalid."],
+        ["403 error", 403, MSDynamics365CrmForbiddenError, "Forbidden. The user does not have the required Dataverse security role or privilege to perform this operation."],
+        ["404 error", 404, MSDynamics365CrmNotFoundError, "Not found. The requested resource or entity record does not exist."],
+        ["409 error", 409, MSDynamics365CrmConflictError, "Conflict. The operation conflicts with an existing record (duplicate detection or concurrency violation)."],
     ])
     def test_make_request_http_failure_without_retry(self, test_name, error_code, error, error_message):
         mock_response = MockResponse(error_code, json_data={})
@@ -117,11 +117,11 @@ class TestClient(unittest.TestCase):
         self.assertEqual(str(e.exception), expected_error_message)
 
     @parameterized.expand([
-        ["422 error", 422, MSDynamics365CrmUnprocessableEntityError, "The request content itself is not processable by the server."],
-        ["500 error", 500, MSDynamics365CrmInternalServerError, "The server encountered an unexpected condition which prevented it from fulfilling the request."],
-        ["501 error", 501, MSDynamics365CrmNotImplementedError, "The server does not support the functionality required to fulfill the request."],
-        ["502 error", 502, MSDynamics365CrmBadGatewayError, "Server received an invalid response."],
-        ["503 error", 503, MSDynamics365CrmServiceUnavailableError, "API service is currently unavailable."],
+        ["422 error", 422, MSDynamics365CrmUnprocessableEntityError, "Unprocessable entity. The request was well-formed but could not be processed."],
+        ["500 error", 500, MSDynamics365CrmInternalServerError, "Internal server error. The server encountered an unexpected condition which prevented it from fulfilling the request."],
+        ["501 error", 501, MSDynamics365CrmNotImplementedError, "Not implemented. The server does not support the functionality required to fulfill the request."],
+        ["502 error", 502, MSDynamics365CrmBadGatewayError, "Bad gateway. An upstream proxy or load balancer received an invalid response from the MS Dynamics server."],
+        ["503 error", 503, MSDynamics365CrmServiceUnavailableError, "Service unavailable. The MS Dynamics 365 API service is temporarily unavailable. Retry after a short delay."],
     ])
     @patch("time.sleep")
     def test_make_request_http_failure_with_retry(self, test_name, error_code, error, error_message, mock_sleep):
