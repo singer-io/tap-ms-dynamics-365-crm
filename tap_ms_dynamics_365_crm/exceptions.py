@@ -27,11 +27,23 @@ class MSDynamics365CrmNotFoundError(MSDynamics365CrmError):
     """class representing 404 status code."""
     pass
 
+class MSDynamics365CrmMethodNotAllowedError(MSDynamics365CrmError):
+    """class representing 405 status code."""
+    pass
+
+class MSDynamics365CrmPreconditionFailedError(MSDynamics365CrmError):
+    """class representing 412 status code."""
+    pass
+
+class MSDynamics365CrmPayloadTooLargeError(MSDynamics365CrmError):
+    """class representing 413 status code."""
+    pass
+
 class MSDynamics365CrmConflictError(MSDynamics365CrmError):
     """class representing 409 status code."""
     pass
 
-class MSDynamics365CrmUnprocessableEntityError(MSDynamics365CrmBackoffError):
+class MSDynamics365CrmUnprocessableEntityError(MSDynamics365CrmError):
     """class representing 422 status code."""
     pass
 
@@ -74,9 +86,21 @@ ERROR_CODE_EXCEPTION_MAPPING = {
         "raise_exception": MSDynamics365CrmNotFoundError,
         "message": "Not found. The requested resource or entity record does not exist."
     },
+    405: {
+        "raise_exception": MSDynamics365CrmMethodNotAllowedError,
+        "message": "Method not allowed. The HTTP method used is not supported for this resource."
+    },
     409: {
         "raise_exception": MSDynamics365CrmConflictError,
         "message": "Conflict. The operation conflicts with an existing record (duplicate detection or concurrency violation)."
+    },
+    412: {
+        "raise_exception": MSDynamics365CrmPreconditionFailedError,
+        "message": "Precondition failed. A condition specified in the request headers (e.g. If-Match) was not met."
+    },
+    413: {
+        "raise_exception": MSDynamics365CrmPayloadTooLargeError,
+        "message": "Payload too large. The request body exceeds the size limit allowed by the server."
     },
     422: {
         "raise_exception": MSDynamics365CrmUnprocessableEntityError,

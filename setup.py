@@ -11,8 +11,8 @@ setup(name="tap-ms-dynamics-365-crm",
       classifiers=["Programming Language :: Python :: 3 :: Only"],
       py_modules=["tap_ms_dynamics_365_crm"],
       install_requires=[
-        "singer-python==6.7.0",
-        "requests==2.32.5",
+        "singer-python==6.8.0",
+        "requests==2.33.0",
         "backoff==2.2.1",
         "msal==1.34.0",
         "parameterized==0.9.0"
