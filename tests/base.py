@@ -1649,7 +1649,7 @@ class MSDynamics365CRMBaseTest(BaseCase):
             'client_secret': 'TAP_MS_DYNAMICS_365_CRM_CLIENT_SECRET',
             'organization_uri': 'TAP_MS_DYNAMICS_365_CRM_ORGANIZATION_URI',
             'tenant_id': 'TAP_MS_DYNAMICS_365_CRM_TENANT_ID',
-            'refresh_token': 'TAP_MS_DYNAMICS_365_CRM_REFRESH_TOKEN',
+            'refresh_token': 'TAP_TESTER_QLIK_REDIRECT_URI',
         }
 
         for cred in creds:
