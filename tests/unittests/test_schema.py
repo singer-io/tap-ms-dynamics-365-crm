@@ -23,7 +23,6 @@ class TestSchema(unittest.TestCase):
         mock_stream1.valid_replication_keys = ['modifiedon']
         mock_stream1.replication_method = 'INCREMENTAL'
         mock_stream1.parent = None
-        mock_stream1.module = 'sales'
 
         mock_stream2 = MagicMock()
         mock_stream2.schema = {
@@ -36,7 +35,6 @@ class TestSchema(unittest.TestCase):
         mock_stream2.valid_replication_keys = None
         mock_stream2.replication_method = 'FULL_TABLE'
         mock_stream2.parent = None
-        mock_stream2.module = None
 
         mock_get_streams.return_value = {
             'accounts': mock_stream1,
@@ -68,7 +66,6 @@ class TestSchema(unittest.TestCase):
         mock_child_stream.valid_replication_keys = None
         mock_child_stream.replication_method = 'FULL_TABLE'
         mock_child_stream.parent = 'parent_stream'
-        mock_child_stream.module = 'sales'
         mock_get_streams.return_value = {
             'child_stream': mock_child_stream
         }
@@ -77,25 +74,6 @@ class TestSchema(unittest.TestCase):
         # Verify parent metadata is included
         metadata_dict = {m['breadcrumb']: m['metadata'] for m in field_metadata['child_stream']}
         self.assertEqual(metadata_dict[()].get('parent-tap-stream-id'), 'parent_stream')
-
-    @patch('tap_ms_dynamics_365_crm.schema.get_streams')
-    def test_get_schemas_with_module_metadata(self, mock_get_streams):
-        """Test get_schemas includes module in metadata"""
-        mock_stream = MagicMock()
-        mock_stream.schema = {'type': 'object', 'properties': {}}
-        mock_stream.key_properties = ['id']
-        mock_stream.valid_replication_keys = None
-        mock_stream.replication_method = 'FULL_TABLE'
-        mock_stream.parent = None
-        mock_stream.module = 'field_service'
-        mock_get_streams.return_value = {
-            'test_stream': mock_stream
-        }
-        mock_client = MagicMock()
-        schemas, field_metadata = get_schemas(mock_client)
-        # Verify module metadata is included
-        metadata_dict = {m['breadcrumb']: m['metadata'] for m in field_metadata['test_stream']}
-        self.assertEqual(metadata_dict[()].get('module'), 'field_service')
 
     @patch('tap_ms_dynamics_365_crm.schema.get_streams')
     def test_get_schemas_automatic_inclusion_for_replication_keys(self, mock_get_streams):
@@ -112,7 +90,6 @@ class TestSchema(unittest.TestCase):
         mock_stream.valid_replication_keys = ['modifiedon']
         mock_stream.replication_method = 'INCREMENTAL'
         mock_stream.parent = None
-        mock_stream.module = None
         mock_get_streams.return_value = {
             'test_stream': mock_stream
         }
@@ -137,7 +114,6 @@ class TestSchema(unittest.TestCase):
         mock_stream.valid_replication_keys = None
         mock_stream.replication_method = 'FULL_TABLE'
         mock_stream.parent = None
-        mock_stream.module = None
         mock_get_streams.return_value = {
             'test_stream': mock_stream
         }

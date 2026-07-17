@@ -73,14 +73,6 @@ def build_entity_metadata(client: Client, included_entities: dict):
             # checks that entity is in $metadata response
             entity_metadata[entity_name]["LogicalName"] = entity_name
             entity_metadata[entity_name]["EntitySetName"] = entity.get("EntitySetName")
-
-            # Determine module name by checking which module set contains this entity
-            module_name = None
-            for module, entities in included_entities.items():
-                if entity_name in entities:
-                    module_name = module
-                    break
-            entity_metadata[entity_name]["module_name"] = module_name
             yield entity_metadata[entity_name]
 
 def get_streams(client: Client, create_schema: bool = True) -> dict:
@@ -103,7 +95,6 @@ def get_streams(client: Client, create_schema: bool = True) -> dict:
         stream_name = stream.get('LogicalName')
         stream_endpoint = stream.get('EntitySetName')
         stream_key = stream.get('Key')
-        module_name = stream.get('module_name')
         LOGGER.info('Processing stream: {}'.format(stream_name))
 
         # skip over any streams that don't have a name or are in EXCLUDED_ENTITIES
@@ -124,7 +115,6 @@ def get_streams(client: Client, create_schema: bool = True) -> dict:
         stream_obj.key_properties = [stream_key]
         stream_obj.path = stream_endpoint
         stream_obj.replication_method = replication_method
-        stream_obj.module = module_name
 
         if replication_method == 'INCREMENTAL':
             stream_obj.replication_keys = [replication_key]

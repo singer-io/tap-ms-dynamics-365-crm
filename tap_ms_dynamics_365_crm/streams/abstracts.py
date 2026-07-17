@@ -33,7 +33,6 @@ class BaseStream(ABC):
     data_key = "value"
     parent_bookmark_key = ""
     http_method = "GET"
-    module = None
 
     def __init__(self, client: Client = None) -> None:
         self.client = client

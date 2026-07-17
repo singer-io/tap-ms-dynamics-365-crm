@@ -15,7 +15,6 @@ class MSDynamics365CRMInterruptedSyncTest(InterruptedSyncTest, MSDynamics365CRMB
         included_streams = set({
             "account",
             "contact",
-            "incident",
             "knowledgearticle",
             "lead",
             "msdyn_bookingsetupmetadata",
@@ -38,10 +37,9 @@ class MSDynamics365CRMInterruptedSyncTest(InterruptedSyncTest, MSDynamics365CRMB
 
     def manipulate_state(self):
         return {
-            "currently_syncing": "incident",
+            "currently_syncing": "contact",
             "bookmarks": {
                 "account": {"modifiedon": "2026-01-01T00:00:00.000000Z"},
                 "contact": {"modifiedon": "2026-01-01T00:00:00.000000Z"},
-                "incident": {"modifiedon": "2026-01-06T14:16:05.000000Z"},
             }
         }
