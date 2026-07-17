@@ -41,9 +41,6 @@ def get_schemas(client: Client) -> Tuple[Dict, Dict]:
         if parent_tap_stream_id:
             mdata = metadata.write(mdata, (), 'parent-tap-stream-id', parent_tap_stream_id)
 
-        if getattr(stream_obj, "module", None):
-            mdata = metadata.write(mdata, (), 'module', getattr(stream_obj, "module"))
-
         mdata = metadata.to_list(mdata)
         field_metadata[stream_name] = mdata
 
