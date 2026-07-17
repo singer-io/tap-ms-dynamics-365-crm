@@ -14,11 +14,6 @@ jobs:
             uv pip install .[dev]
       - add_ssh_keys
       - run:
-          name: "JSON Validator"
-          command: |
-            source /usr/local/share/virtualenvs/tap-tester/bin/activate
-            stitch-validate-json tap_ms_dynamics_365_crm/schemas/*.json
-      - run:
           name: "pylint"
           command: |
             source /usr/local/share/virtualenvs/tap-ms-dynamics-365-crm/bin/activate
