@@ -1644,7 +1644,7 @@ class MSDynamics365CRMBaseTest(BaseCase):
         """Authentication information for the test account."""
         credentials_dict = {}
         creds = {
-            'auth_method': 'TAP_MS_DYNAMICS_365_CRM_AUTH_METHOD',
+            'auth_method': 'client_credentials',
             'client_id': 'TAP_MS_DYNAMICS_365_CRM_CLIENT_ID',
             'client_secret': 'TAP_MS_DYNAMICS_365_CRM_CLIENT_SECRET',
             'organization_uri': 'TAP_MS_DYNAMICS_365_CRM_ORGANIZATION_URI',
@@ -1653,7 +1653,10 @@ class MSDynamics365CRMBaseTest(BaseCase):
         }
 
         for cred in creds:
-            credentials_dict[cred] = os.getenv(creds[cred])
+            if cred == 'auth_method':
+                credentials_dict[cred] = creds[cred]
+            else:
+                credentials_dict[cred] = os.getenv(creds[cred])
 
         return credentials_dict
 
