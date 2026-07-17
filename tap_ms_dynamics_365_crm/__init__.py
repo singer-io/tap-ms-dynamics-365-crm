@@ -21,7 +21,9 @@ def do_discover(client: Client):
     LOGGER.info("Starting discover")
     catalog = discover(client=client)
     json.dump(catalog.to_dict(), sys.stdout, indent=2)
+    sys.stdout.write('\n')
     sys.stdout.flush()
+    sys.stderr.flush()
     LOGGER.info("Finished discover")
 
 
