@@ -1647,7 +1647,7 @@ class MSDynamics365CRMBaseTest(BaseCase):
             'auth_method': 'client_credentials',
             'client_id': 'TAP_MS_DYNAMICS_365_CRM_CLIENT_ID',
             'client_secret': 'TAP_MS_DYNAMICS_365_CRM_CLIENT_SECRET',
-            'organization_uri': 'TAP_MS_DYNAMICS_365_CRM_ORGANIZATION_URI',
+            'organization_uri': 'TAP_TESTER_QLIK_REDIRECT_URI',
             'tenant_id': 'TAP_MS_DYNAMICS_365_CRM_TENANT_ID',
             'refresh_token': 'TAP_MS_DYNAMICS_365_CRM_REFRESH_TOKEN',
         }
