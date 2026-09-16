@@ -97,7 +97,7 @@ def get_streams(client: Client, create_schema: bool = True) -> dict:
     # dynamically build streams by iterating over entities and calling build_schema()
     for stream in build_entity_metadata(client, included_entities):
         stream_name = stream.get('LogicalName')
-        stream_endpoint = (stream.get('EntitySetName') or '').lower()
+        stream_endpoint = stream.get('EntitySetName') or ''
         stream_key = stream.get('Key')
         LOGGER.info('Processing stream: {}'.format(stream_name))
 
@@ -146,7 +146,7 @@ def get_streams(client: Client, create_schema: bool = True) -> dict:
 
         STREAMS.update({stream_name: stream_obj})
 
-    if create_schema and not STREAMS:
+    if create_schema and not STREAMS and inaccessible_streams:
         raise MSDynamics365CrmForbiddenError(
             "HTTP-error-code: 403, Error: The credentials do not have "
             "'read' access to any supported streams."
