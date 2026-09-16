@@ -9,6 +9,7 @@ from tap_ms_dynamics_365_crm.streams.abstracts import (
     IncrementalStream,
     FullTableStream
 )
+from tap_ms_dynamics_365_crm.exceptions import MSDynamics365CrmForbiddenError
 
 LOGGER = singer.get_logger()
 
@@ -47,7 +48,7 @@ REPLICATION_TO_STREAM_MAP = {
 def call_entity_definitions(client: Client):
     """Calls the `EntityDefinitions` endpoint to get all entities."""
     params = {
-        "$select": "MetadataId,LogicalName,EntitySetName",
+        "$select": "MetadataId,LogicalName,EntitySetName,IsCustomEntity,IsManaged",
         "$count": "true",
     }
 
@@ -69,8 +70,10 @@ def build_entity_metadata(client: Client, included_entities: dict):
 
     for entity in entity_definitions:
         entity_name = entity.get("LogicalName")
-        if any(entity_name in entities for entities in included_entities.values()) and entity_name in entity_metadata:
-            # checks that entity is in $metadata response
+        is_custom = entity.get("IsCustomEntity")
+        is_managed = entity.get("IsManaged")
+        is_included = any(entity_name in entities for entities in included_entities.values())
+        if ((is_custom and not is_managed) or is_included) and entity_name in entity_metadata:
             entity_metadata[entity_name]["LogicalName"] = entity_name
             entity_metadata[entity_name]["EntitySetName"] = entity.get("EntitySetName")
             yield entity_metadata[entity_name]
@@ -88,12 +91,13 @@ def get_streams(client: Client, create_schema: bool = True) -> dict:
     excluded_entities = EXCLUDED_ENTITIES
 
     STREAMS = {} # pylint: disable=invalid-name
+    inaccessible_streams = []
     replication_key = 'modifiedon'
 
     # dynamically build streams by iterating over entities and calling build_schema()
     for stream in build_entity_metadata(client, included_entities):
         stream_name = stream.get('LogicalName')
-        stream_endpoint = stream.get('EntitySetName')
+        stream_endpoint = stream.get('EntitySetName') or ''
         stream_key = stream.get('Key')
         LOGGER.info('Processing stream: {}'.format(stream_name))
 
@@ -131,10 +135,28 @@ def get_streams(client: Client, create_schema: bool = True) -> dict:
                 stream_obj.schema['properties'][stream_obj.key_properties[0]] = {
                     'type': ['null', 'string']
                 }
+
+            # verify the credentials can actually read this entity before
+            # adding it to the catalog
+            if not stream_obj.check_access():
+                inaccessible_streams.append(stream_name)
+                continue
         else:
             stream_obj.schema = {}
 
         STREAMS.update({stream_name: stream_obj})
+
+    if create_schema and not STREAMS and inaccessible_streams:
+        raise MSDynamics365CrmForbiddenError(
+            "HTTP-error-code: 403, Error: The credentials do not have "
+            "'read' access to any supported streams."
+        )
+
+    if create_schema and inaccessible_streams:
+        LOGGER.warning(
+            "Unauthorized streams excluded from catalog: %s",
+            ", ".join(inaccessible_streams),
+        )
 
     return STREAMS
 
