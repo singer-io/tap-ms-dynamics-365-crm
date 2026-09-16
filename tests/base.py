@@ -2,6 +2,7 @@ import json
 import os
 
 from tap_tester.base_suite_tests.base_case import BaseCase
+from tap_tester import menagerie, runner
 
 
 EXPECTED_METADATA_RAW = json.loads('''
@@ -1610,6 +1611,20 @@ class MSDynamics365CRMBaseTest(BaseCase):
     PARENT_TAP_STREAM_ID = "parent-tap-stream-id"
     _expected_metadata_cache = None
 
+    # Org-specific custom entities (created ad-hoc in the test sandbox using the
+    # default "new_" customization prefix) that are not part of the tap's
+    # standard expected metadata. These are always excluded from discovery
+    # test comparisons so the test suite doesn't break when the sandbox's
+    # custom entities change.
+    CUSTOM_STREAMS_TO_SKIP = {
+        "new_testcustomactivity",
+        "new_testelastic",
+        "new_testequipmentlog",
+        "new_testproject",
+        "new_testrichtype",
+        "new_testsurveyresponse",
+    }
+
     @staticmethod
     def tap_name():
         """The name of the tap."""
@@ -1638,6 +1653,33 @@ class MSDynamics365CRMBaseTest(BaseCase):
         }
 
         return cls._expected_metadata_cache
+
+    def run_and_verify_check_mode(self, conn_id):
+        """
+        Run check mode and verify it succeeds, excluding the org-specific
+        custom entities in CUSTOM_STREAMS_TO_SKIP from the discovered catalog
+        before comparing against expected streams.
+
+        Return the found catalogs from menagerie.
+        """
+        check_job_name = runner.run_check_mode(self, conn_id)
+
+        exit_status = menagerie.get_exit_status(conn_id, check_job_name)
+        menagerie.verify_check_exit_status(self, exit_status, check_job_name)
+
+        found_catalogs = [
+            catalog for catalog in menagerie.get_catalogs(conn_id)
+            if catalog['stream_name'] not in self.CUSTOM_STREAMS_TO_SKIP
+        ]
+        self.assertGreater(len(found_catalogs), 0,
+                           logging="A catalog was produced by discovery.")
+
+        found_stream_names = {catalog['stream_name'] for catalog in found_catalogs}
+        self.assertSetEqual(self.expected_stream_names(), found_stream_names,
+                            logging="Expected streams are present in catalog.")
+
+        return found_catalogs
+
 
     @staticmethod
     def get_credentials():
