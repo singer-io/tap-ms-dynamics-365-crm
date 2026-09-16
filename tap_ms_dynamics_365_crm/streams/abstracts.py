@@ -11,6 +11,9 @@ from singer import (
     metadata
 )
 from tap_ms_dynamics_365_crm.client import Client, MAX_PAGESIZE
+from tap_ms_dynamics_365_crm.exceptions import (
+    MSDynamics365CrmForbiddenError
+)
 
 LOGGER = get_logger()
 
@@ -160,6 +163,23 @@ class BaseStream(ABC):
         """
         return self.url_endpoint or f"{self.client.base_url}/{self.path}"
 
+    def check_access(self) -> bool:
+        """
+        Verifies that the credentials can read at least one record from this
+        stream's entity set. Returns False when the entity set isn't plainly
+        queryable via a simple GET:
+         - 403 Forbidden: credentials lack access to the entity.
+        """
+        endpoint = self.get_url_endpoint()
+        try:
+            self.client.make_request(method='GET', endpoint=endpoint, params={'$top': 1})
+            return True
+        except MSDynamics365CrmForbiddenError as exc:
+            LOGGER.warning(
+                "Unauthorized Stream: %s, excluding from catalog. HTTP-Error-Message: '%s'",
+                self.tap_stream_id, str(exc),
+            )
+            return False
 
 class IncrementalStream(BaseStream):
     """Base Class for Incremental Stream."""
