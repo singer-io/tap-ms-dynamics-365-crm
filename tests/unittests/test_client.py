@@ -4,12 +4,14 @@ from unittest.mock import patch, Mock
 from parameterized import parameterized
 from requests.exceptions import Timeout, ConnectionError, ChunkedEncodingError
 from datetime import datetime, timedelta
+from simplejson import JSONDecodeError
 from tap_ms_dynamics_365_crm.client import (
     Client,
     raise_for_error,
     retry_after_wait_gen,
     AUTH_METHOD_CLIENT_CREDENTIALS,
-    AUTH_METHOD_AUTHORIZATION_CODE
+    AUTH_METHOD_AUTHORIZATION_CODE,
+    REQUEST_TIMEOUT,
 )
 from tap_ms_dynamics_365_crm.exceptions import (
     MSDynamics365CrmError,
@@ -351,3 +353,215 @@ class TestClient(unittest.TestCase):
 
         self.assertIn("invalid_client", str(exc.exception))
         self.assertIn("Invalid client secret", str(exc.exception))
+
+    def test_raise_for_error_response_json_raises_exception(self):
+        """Test raise_for_error falls back to an empty dict when response.json() itself fails"""
+        error_response = MockResponse(500, json_data={})
+        error_response.json = Mock(side_effect=ValueError("not json"))
+
+        with self.assertRaises(MSDynamics365CrmInternalServerError) as e:
+            raise_for_error(error_response)
+
+        self.assertIn("Internal server error", str(e.exception))
+
+    def test_raise_for_error_response_json_not_a_dict(self):
+        """Test raise_for_error handles a non-dict JSON body (e.g. a list)"""
+        error_response = MockResponse(400, json_data=["unexpected", "list", "body"])
+
+        with self.assertRaises(MSDynamics365CrmBadRequestError) as e:
+            raise_for_error(error_response)
+
+        self.assertIn("['unexpected', 'list', 'body']", str(e.exception))
+
+    def test_retry_after_wait_gen_invalid_retry_after_value(self):
+        """Retry-After present but non-positive falls back to the default wait time"""
+        gen = retry_after_wait_gen()
+        exc = MSDynamics365CrmRateLimitError("rate limited")
+        exc.response = Mock(headers={'Retry-After': '0'})
+
+        with patch("tap_ms_dynamics_365_crm.client.LOGGER") as mock_logger:
+            try:
+                raise exc
+            except MSDynamics365CrmRateLimitError:
+                wait_time = next(gen)
+
+        self.assertEqual(wait_time, 60)
+        mock_logger.warning.assert_called_once()
+
+    def test_retry_after_wait_gen_non_numeric_retry_after_value(self):
+        """Retry-After present but non-numeric falls back to the default wait time"""
+        gen = retry_after_wait_gen()
+        exc = MSDynamics365CrmRateLimitError("rate limited")
+        exc.response = Mock(headers={'Retry-After': 'not-a-number'})
+
+        with patch("tap_ms_dynamics_365_crm.client.LOGGER") as mock_logger:
+            try:
+                raise exc
+            except MSDynamics365CrmRateLimitError:
+                wait_time = next(gen)
+
+        self.assertEqual(wait_time, 60)
+        mock_logger.warning.assert_called_once()
+
+    def test_authenticate_merges_provided_headers_with_standard_headers(self):
+        """Test authenticate merges caller-supplied headers with the standard ones"""
+        with patch.object(self.client, "get_access_token", return_value="test_token"):
+            headers, params = self.client.authenticate({"X-Custom": "value"}, {"$top": 1})
+
+        self.assertEqual(headers["X-Custom"], "value")
+        self.assertEqual(headers["Authorization"], "Bearer test_token")
+        self.assertEqual(params, {"$top": 1})
+
+    def test_make_request_post_with_body_sets_json_kwarg(self):
+        """Test make_request serializes a non-empty body as JSON for POST requests"""
+        mock_response = MockResponse(200, json_data={"data": "created"})
+        with patch.object(self.client._session, "request", return_value=mock_response) as mock_request:
+            with patch.object(self.client, "get_access_token", return_value="test_token"):
+                result = self.client.make_request(
+                    "POST", endpoint="https://api.example.com/test", body={"name": "value"}
+                )
+
+        self.assertEqual(result, {"data": "created"})
+        self.assertEqual(mock_request.call_args.kwargs["json"], {"name": "value"})
+
+    def test_make_request_unsupported_method_raises(self):
+        """Test __make_request raises ValueError for an unsupported HTTP method"""
+        with self.assertRaises(ValueError) as e:
+            self.client._Client__make_request("HEAD", "https://api.example.com/resource")
+
+        self.assertIn("Unsupported method", str(e.exception))
+
+    def test_make_request_response_json_decode_error_falls_back_to_text(self):
+        """Test __make_request returns response.text when JSON decoding fails"""
+        mock_response = MockResponse(200, text="plain text body")
+        mock_response.json = Mock(side_effect=JSONDecodeError("bad json", "plain text body", 0))
+        with patch.object(self.client._session, "request", return_value=mock_response):
+            result = self.client._Client__make_request("GET", "https://api.example.com/resource")
+
+        self.assertEqual(result, "plain text body")
+
+    def test_refresh_access_token_success_updates_token_and_expiry(self):
+        """Test _refresh_access_token acquires and stores a new access token"""
+        mock_response = MockResponse(
+            200,
+            json_data={
+                "access_token": "new-access-token",
+                "expires_in": 3600,
+                "refresh_token": self.client.refresh_token,
+            },
+        )
+        with patch.object(self.client._session, "post", return_value=mock_response):
+            self.client._refresh_access_token()
+
+        self.assertEqual(self.client._access_token, "new-access-token")
+        self.assertIsNotNone(self.client._expires_at)
+
+    def test_refresh_access_token_writes_new_refresh_token_when_changed(self):
+        """Test _refresh_access_token persists the refresh token when it rotates"""
+        mock_response = MockResponse(
+            200,
+            json_data={
+                "access_token": "new-access-token",
+                "expires_in": 3600,
+                "refresh_token": "rotated-refresh-token",
+            },
+        )
+        with patch.object(self.client._session, "post", return_value=mock_response), \
+                patch.object(self.client, "_write_config") as mock_write_config:
+            self.client._refresh_access_token()
+
+        mock_write_config.assert_called_once_with("rotated-refresh-token")
+
+    def test_refresh_access_token_non_200_raises(self):
+        """Test _refresh_access_token raises when the token endpoint returns non-200"""
+        mock_response = MockResponse(400, json_data={})
+        with patch.object(self.client._session, "post", return_value=mock_response):
+            with self.assertRaises(MSDynamics365CrmError) as e:
+                self.client._refresh_access_token()
+
+        self.assertIn("Non-200 response", str(e.exception))
+
+    def test_get_access_token_uses_authorization_code_refresh_by_default(self):
+        """Test get_access_token falls back to the refresh-token flow for authorization_code auth"""
+        self.client._access_token = None
+        self.client._expires_at = None
+
+        with patch.object(self.client, "_refresh_access_token") as mock_refresh, \
+                patch.object(self.client, "_acquire_access_token_client_credentials") as mock_client_credentials:
+            mock_refresh.side_effect = lambda: setattr(self.client, "_access_token", "refreshed-token")
+            token = self.client.get_access_token()
+
+        self.assertEqual(token, "refreshed-token")
+        mock_refresh.assert_called_once()
+        mock_client_credentials.assert_not_called()
+
+    def test_client_defaults_auth_method_when_not_provided(self):
+        """Test __init__ defaults auth_method to authorization_code when omitted"""
+        config = default_config.copy()
+        del config["auth_method"]
+        client = Client(config_path="config.json", config=config)
+
+        self.assertEqual(client.auth_method, AUTH_METHOD_AUTHORIZATION_CODE)
+
+    def test_client_defaults_auth_method_when_empty_string(self):
+        """Test __init__ defaults auth_method to authorization_code when empty string"""
+        config = default_config.copy()
+        config["auth_method"] = ""
+        client = Client(config_path="config.json", config=config)
+
+        self.assertEqual(client.auth_method, AUTH_METHOD_AUTHORIZATION_CODE)
+
+    def test_client_defaults_request_timeout_when_not_provided(self):
+        """Test __init__ falls back to the default request_timeout when omitted"""
+        config = default_config.copy()
+        del config["request_timeout"]
+        client = Client(config_path="config.json", config=config)
+
+        self.assertEqual(client.request_timeout, REQUEST_TIMEOUT)
+
+    def test_client_context_manager_checks_credentials_and_closes_session(self):
+        """Test __enter__ validates credentials and __exit__ closes the session"""
+        with patch.object(Client, "check_api_credentials") as mock_check, \
+                patch.object(requests.Session, "close") as mock_close:
+            with Client(config_path="config.json", config=default_config.copy()) as client:
+                self.assertIsInstance(client, Client)
+            mock_check.assert_called_once()
+        mock_close.assert_called_once()
+
+    def test_check_api_credentials_missing_client_id(self):
+        """Test credential validation fails with missing client_id"""
+        invalid_config = default_config.copy()
+        invalid_config["client_id"] = ""
+        client = Client(config_path="config.json", config=invalid_config)
+
+        with self.assertRaises(ValueError) as e:
+            client.check_api_credentials()
+        self.assertIn("client_id", str(e.exception))
+
+    def test_check_api_credentials_invalid_request_timeout(self):
+        """Test credential validation fails when request_timeout is non-positive"""
+        client = Client(config_path="config.json", config=default_config.copy())
+        client.request_timeout = 0
+
+        with self.assertRaises(ValueError) as e:
+            client.check_api_credentials()
+        self.assertIn("request_timeout", str(e.exception))
+
+    def test_check_api_credentials_invalid_auth_method_value(self):
+        """Test credential validation fails when auth_method is not a supported value"""
+        client = Client(config_path="config.json", config=default_config.copy())
+        client.auth_method = "unsupported_method"
+
+        with self.assertRaises(ValueError) as e:
+            client.check_api_credentials()
+        self.assertIn("Invalid auth_method", str(e.exception))
+
+    def test_check_api_credentials_authorization_code_missing_client_secret(self):
+        """Test credential validation fails when authorization_code auth_method has no client_secret"""
+        invalid_config = default_config.copy()
+        invalid_config["client_secret"] = ""
+        client = Client(config_path="config.json", config=invalid_config)
+
+        with self.assertRaises(ValueError) as e:
+            client.check_api_credentials()
+        self.assertIn("client_secret", str(e.exception))

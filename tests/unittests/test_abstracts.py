@@ -1,6 +1,13 @@
 import unittest
 from unittest.mock import MagicMock, patch, call
-from tap_ms_dynamics_365_crm.streams.abstracts import BaseStream
+from tap_ms_dynamics_365_crm.streams.abstracts import BaseStream, IncrementalStream, FullTableStream
+from tap_ms_dynamics_365_crm.client import AUTH_METHOD_AUTHORIZATION_CODE, AUTH_METHOD_CLIENT_CREDENTIALS
+from tap_ms_dynamics_365_crm.exceptions import (
+    MSDynamics365CrmForbiddenError,
+    MSDynamics365CrmUnauthorizedError,
+    MSDynamics365CrmNotFoundError,
+    MSDynamics365CrmMethodNotAllowedError,
+)
 
 
 class ConcreteStream(BaseStream):
@@ -10,8 +17,275 @@ class ConcreteStream(BaseStream):
         return {}
 
 
+class TestBaseStreamCheckAccess(unittest.TestCase):
+    """Test BaseStream.check_access functionality"""
+
+    def _make_stream(self, tap_stream_id="competitor", path="competitors"):
+        client = MagicMock()
+        client.max_pagesize = 5000
+        client.config = {}
+        client.base_url = "https://org.api.crm.dynamics.com/api/data/v9.2"
+        client.auth_method = AUTH_METHOD_CLIENT_CREDENTIALS
+        stream = ConcreteStream(client=client)
+        stream.tap_stream_id = tap_stream_id
+        stream.path = path
+        return stream, client
+
+    def test_check_access_returns_true_on_success(self):
+        stream, client = self._make_stream()
+        client.make_request.return_value = {"value": []}
+
+        self.assertTrue(stream.check_access())
+        client.make_request.assert_called_once_with(
+            method='GET',
+            endpoint="https://org.api.crm.dynamics.com/api/data/v9.2/competitors",
+            params={'$top': 1},
+        )
+
+    def test_check_access_returns_false_on_forbidden(self):
+        stream, client = self._make_stream(tap_stream_id="some_entity")
+        client.make_request.side_effect = MSDynamics365CrmForbiddenError(
+            "HTTP-error-code: 403, Error: Forbidden."
+        )
+
+        self.assertFalse(stream.check_access())
+
+    def test_check_access_reraises_not_found_errors(self):
+        """404s are not treated as a known-unqueryable signature and
+        propagate rather than being silently excluded."""
+        stream, client = self._make_stream(
+            tap_stream_id="attributepicklistvalue", path="attributepicklistvalues"
+        )
+        client.make_request.side_effect = MSDynamics365CrmNotFoundError(
+            "HTTP-error-code: 404, Error Code: 0x80060888, Error: Resource not found "
+            "for the segment 'AttributePicklistValues'."
+        )
+
+        with self.assertRaises(MSDynamics365CrmNotFoundError):
+            stream.check_access()
+
+    def test_check_access_reraises_method_not_allowed_errors(self):
+        stream, client = self._make_stream(tap_stream_id="some_entity")
+        client.make_request.side_effect = MSDynamics365CrmMethodNotAllowedError(
+            "HTTP-error-code: 405, Error: Method Not Allowed."
+        )
+
+        with self.assertRaises(MSDynamics365CrmMethodNotAllowedError):
+            stream.check_access()
+
+    def test_check_access_reraises_unrelated_errors(self):
+        stream, client = self._make_stream(tap_stream_id="some_entity")
+        client.make_request.side_effect = MSDynamics365CrmUnauthorizedError(
+            "HTTP-error-code: 401, Error: Unauthorized."
+        )
+
+        with self.assertRaises(MSDynamics365CrmUnauthorizedError):
+            stream.check_access()
+
+    def test_check_access_uses_plain_get_for_scoped_entities_under_client_credentials(self):
+        """Entities in SCOPED_ACCESS_CHECK_ENTITIES only need the WhoAmI-based
+        scoped check under authorization_code -- under client_credentials the
+        plain collection GET works fine, so it's used as normal."""
+        stream, client = self._make_stream(
+            tap_stream_id="msdyn_incidenttypessetup", path="msdyn_incidenttypessetups"
+        )
+        client.make_request.return_value = {"value": []}
+
+        self.assertTrue(stream.check_access())
+        client.make_request.assert_called_once_with(
+            method='GET',
+            endpoint="https://org.api.crm.dynamics.com/api/data/v9.2/msdyn_incidenttypessetups",
+            params={'$top': 1},
+        )
+
+
+class TestBaseStreamScopedAccessCheck(unittest.TestCase):
+    """Test BaseStream._check_scoped_access, used for entities in
+    SCOPED_ACCESS_CHECK_ENTITIES (msdyn_requirementdependency,
+    msdyn_incidenttypessetup) under the authorization_code auth method, where
+    they reject a plain collection GET with a 400 'Expected non-empty Guid'
+    but ARE valid, accessible entity sets."""
+
+    def _make_stream(self, tap_stream_id="msdyn_incidenttypessetup", path="msdyn_incidenttypessetups"):
+        client = MagicMock()
+        client.max_pagesize = 5000
+        client.config = {}
+        client.base_url = "https://org.api.crm.dynamics.com/api/data/v9.2"
+        client.auth_method = AUTH_METHOD_AUTHORIZATION_CODE
+        stream = ConcreteStream(client=client)
+        stream.tap_stream_id = tap_stream_id
+        stream.path = path
+        return stream, client
+
+    def test_check_access_scoped_true_on_does_not_exist_404(self):
+        """WhoAmI succeeds and the id-scoped request 404s with 'Does Not
+        Exist' -- this confirms the entity set is reachable, so access is
+        granted even though no record matches the user's id."""
+        stream, client = self._make_stream()
+        client.make_request.side_effect = [
+            {"UserId": "11111111-1111-1111-1111-111111111111", "BusinessUnitId": "bu"},
+            MSDynamics365CrmNotFoundError(
+                "HTTP-error-code: 404, Error Code: 0x80040217, Error: Entity "
+                "'msdyn_incidenttypessetup' With Id = 11111111-1111-1111-1111-111111111111 Does Not Exist"
+            ),
+        ]
+
+        self.assertTrue(stream.check_access())
+        self.assertEqual(client.make_request.call_count, 2)
+        who_am_i_call, scoped_call = client.make_request.call_args_list
+        self.assertEqual(
+            who_am_i_call.kwargs["endpoint"],
+            "https://org.api.crm.dynamics.com/api/data/v9.2/WhoAmI",
+        )
+        self.assertEqual(
+            scoped_call.kwargs["endpoint"],
+            "https://org.api.crm.dynamics.com/api/data/v9.2/msdyn_incidenttypessetups"
+            "(11111111-1111-1111-1111-111111111111)",
+        )
+
+    def test_check_access_scoped_true_on_success(self):
+        """WhoAmI succeeds and the id-scoped request returns a record (200)
+        -- access is confirmed directly."""
+        stream, client = self._make_stream(
+            tap_stream_id="msdyn_requirementdependency", path="msdyn_requirementdependencies"
+        )
+        client.make_request.side_effect = [
+            {"UserId": "22222222-2222-2222-2222-222222222222"},
+            {"msdyn_requirementdependencyid": "22222222-2222-2222-2222-222222222222"},
+        ]
+
+        self.assertTrue(stream.check_access())
+
+    def test_check_access_scoped_false_on_who_am_i_failure(self):
+        stream, client = self._make_stream()
+        client.make_request.side_effect = MSDynamics365CrmForbiddenError(
+            "HTTP-error-code: 403, Error: Forbidden."
+        )
+
+        self.assertFalse(stream.check_access())
+        client.make_request.assert_called_once()
+
+    def test_check_access_scoped_false_on_missing_user_id(self):
+        stream, client = self._make_stream()
+        client.make_request.return_value = {}
+
+        self.assertFalse(stream.check_access())
+        client.make_request.assert_called_once()
+
+    def test_check_access_scoped_false_on_forbidden_scoped_request(self):
+        stream, client = self._make_stream()
+        client.make_request.side_effect = [
+            {"UserId": "33333333-3333-3333-3333-333333333333"},
+            MSDynamics365CrmForbiddenError("HTTP-error-code: 403, Error: Forbidden."),
+        ]
+
+        self.assertFalse(stream.check_access())
+
+    def test_check_access_scoped_reraises_unrelated_404(self):
+        """A 404 that doesn't mention 'Does Not Exist' isn't a confirmed
+        signature, so it's treated as inaccessible (excluded) rather than
+        silently granted."""
+        stream, client = self._make_stream()
+        client.make_request.side_effect = [
+            {"UserId": "44444444-4444-4444-4444-444444444444"},
+            MSDynamics365CrmNotFoundError(
+                "HTTP-error-code: 404, Error Code: 0x80060888, Error: Resource not found "
+                "for the segment 'msdyn_incidenttypessetups'."
+            ),
+        ]
+
+        self.assertFalse(stream.check_access())
+
+
+class TestBaseStreamScopedRecordExtraction(unittest.TestCase):
+    """Test BaseStream.get_records/_get_scoped_records for entities in
+    SCOPED_ACCESS_CHECK_ENTITIES under authorization_code -- sync must use
+    the same WhoAmI + id-scoped GET as check_access, since the normal
+    collection GET isn't supported for these entities under that auth
+    method."""
+
+    def _make_stream(self, tap_stream_id="msdyn_incidenttypessetup", path="msdyn_incidenttypessetups",
+                      auth_method=AUTH_METHOD_AUTHORIZATION_CODE):
+        client = MagicMock()
+        client.max_pagesize = 5000
+        client.config = {}
+        client.base_url = "https://org.api.crm.dynamics.com/api/data/v9.2"
+        client.auth_method = auth_method
+        stream = ConcreteStream(client=client)
+        stream.tap_stream_id = tap_stream_id
+        stream.path = path
+        stream.url_endpoint = stream.get_url_endpoint()
+        return stream, client
+
+    def test_get_records_yields_scoped_record_on_success(self):
+        stream, client = self._make_stream()
+        client.make_request.side_effect = [
+            {"UserId": "55555555-5555-5555-5555-555555555555"},
+            {"msdyn_incidenttypessetupid": "55555555-5555-5555-5555-555555555555"},
+        ]
+
+        records = list(stream.get_records())
+        self.assertEqual(records, [{"msdyn_incidenttypessetupid": "55555555-5555-5555-5555-555555555555"}])
+        who_am_i_call, scoped_call = client.make_request.call_args_list
+        self.assertEqual(
+            scoped_call.kwargs["endpoint"],
+            "https://org.api.crm.dynamics.com/api/data/v9.2/msdyn_incidenttypessetups"
+            "(55555555-5555-5555-5555-555555555555)",
+        )
+
+    def test_get_records_yields_nothing_on_does_not_exist_404(self):
+        stream, client = self._make_stream()
+        client.make_request.side_effect = [
+            {"UserId": "66666666-6666-6666-6666-666666666666"},
+            MSDynamics365CrmNotFoundError(
+                "HTTP-error-code: 404, Error Code: 0x80040217, Error: Entity "
+                "'msdyn_incidenttypessetup' With Id = 66666666-6666-6666-6666-666666666666 Does Not Exist"
+            ),
+        ]
+
+        self.assertEqual(list(stream.get_records()), [])
+
+    def test_get_records_yields_nothing_when_who_am_i_fails(self):
+        stream, client = self._make_stream()
+        client.make_request.side_effect = MSDynamics365CrmForbiddenError(
+            "HTTP-error-code: 403, Error: Forbidden."
+        )
+
+        self.assertEqual(list(stream.get_records()), [])
+        client.make_request.assert_called_once()
+
+    def test_get_records_reraises_unrelated_404(self):
+        stream, client = self._make_stream()
+        client.make_request.side_effect = [
+            {"UserId": "77777777-7777-7777-7777-777777777777"},
+            MSDynamics365CrmNotFoundError(
+                "HTTP-error-code: 404, Error Code: 0x80060888, Error: Resource not found "
+                "for the segment 'msdyn_incidenttypessetups'."
+            ),
+        ]
+
+        with self.assertRaises(MSDynamics365CrmNotFoundError):
+            list(stream.get_records())
+
+    def test_get_records_uses_normal_pagination_under_client_credentials(self):
+        """Under client_credentials, scoped entities fall back to the normal
+        paginated collection GET, since it works fine for that auth method."""
+        stream, client = self._make_stream(auth_method=AUTH_METHOD_CLIENT_CREDENTIALS)
+        client.make_request.return_value = {"value": [{"id": "1"}]}
+
+        records = list(stream.get_records())
+        self.assertEqual(records, [{"id": "1"}])
+        client.make_request.assert_called_once_with(
+            'GET',
+            "https://org.api.crm.dynamics.com/api/data/v9.2/msdyn_incidenttypessetups",
+            headers=stream.headers,
+            params=stream.params,
+        )
+
+
 class TestBaseStreamPagination(unittest.TestCase):
     """Test pagination behavior in BaseStream.get_records"""
+
 
     def test_get_records_with_pagination_clears_params(self):
         """Test that pagination follows @odata.nextLink and clears params"""
@@ -252,3 +526,242 @@ class TestBaseStreamHelperMethods(unittest.TestCase):
 
         result = stream.is_selected()
         self.assertTrue(result)
+
+    def test_write_schema_success(self):
+        """Test write_schema delegates to singer.write_schema"""
+        mock_client = MagicMock()
+        mock_client.max_pagesize = 5000
+
+        stream = ConcreteStream(client=mock_client)
+        stream.tap_stream_id = "account"
+        stream.schema = {"type": "object"}
+        stream.key_properties = ["accountid"]
+
+        with patch("tap_ms_dynamics_365_crm.streams.abstracts.write_schema") as mock_write_schema:
+            stream.write_schema()
+
+        mock_write_schema.assert_called_once_with("account", {"type": "object"}, ["accountid"])
+
+    def test_write_schema_reraises_os_error(self):
+        """Test write_schema logs and re-raises OSError from singer.write_schema"""
+        mock_client = MagicMock()
+        mock_client.max_pagesize = 5000
+
+        stream = ConcreteStream(client=mock_client)
+        stream.tap_stream_id = "account"
+
+        with patch(
+            "tap_ms_dynamics_365_crm.streams.abstracts.write_schema",
+            side_effect=OSError("disk full"),
+        ):
+            with self.assertRaises(OSError):
+                stream.write_schema()
+
+    def test_update_params_with_distinct_secondary_orderby_key(self):
+        """Test update_params appends a secondary orderby key when it differs from the primary"""
+        mock_client = MagicMock()
+        mock_client.max_pagesize = 5000
+
+        stream = ConcreteStream(client=mock_client)
+        stream.update_params(orderby_key='modifiedon', secondary_orderby_key='incidentid')
+
+        self.assertEqual(stream.params['$orderby'], 'modifiedon asc, incidentid asc')
+
+    def test_modify_object_returns_record_unchanged(self):
+        """Test the default modify_object implementation is a no-op passthrough"""
+        mock_client = MagicMock()
+        mock_client.max_pagesize = 5000
+
+        stream = ConcreteStream(client=mock_client)
+        record = {"id": "1"}
+
+        self.assertIs(stream.modify_object(record), record)
+
+
+class TestResolveReplicationKey(unittest.TestCase):
+    """Test IncrementalStream._resolve_replication_key"""
+
+    def test_raises_when_no_key_and_no_replication_keys(self):
+        mock_client = MagicMock()
+        mock_client.max_pagesize = 5000
+        stream = IncrementalStream(client=mock_client)
+        stream.tap_stream_id = "account"
+        stream.replication_keys = []
+
+        with self.assertRaises(ValueError) as e:
+            stream._resolve_replication_key()
+
+        self.assertIn("misconfigured", str(e.exception))
+
+    def test_falls_back_to_first_replication_key(self):
+        mock_client = MagicMock()
+        mock_client.max_pagesize = 5000
+        stream = IncrementalStream(client=mock_client)
+        stream.replication_keys = ["modifiedon"]
+
+        self.assertEqual(stream._resolve_replication_key(), "modifiedon")
+
+
+class TestIncrementalStreamBookmarksAndSync(unittest.TestCase):
+    """Test IncrementalStream.write_bookmark and IncrementalStream.sync"""
+
+    def _make_stream(self, tap_stream_id="incident"):
+        client = MagicMock()
+        client.max_pagesize = 5000
+        client.config = {"start_date": "2024-01-01T00:00:00Z"}
+        client.base_url = "https://org.api.crm.dynamics.com/api/data/v9.2"
+        stream = IncrementalStream(client=client)
+        stream.tap_stream_id = tap_stream_id
+        stream.path = f"{tap_stream_id}s"
+        return stream
+
+    def test_write_bookmark_returns_state_unchanged_when_key_not_resolvable(self):
+        """When the resolved replication key is falsy, write_bookmark is a no-op"""
+        stream = self._make_stream()
+        stream.replication_keys = [""]
+        state = {"existing": "value"}
+
+        result = stream.write_bookmark(state, stream.tap_stream_id, value="2024-01-01T00:00:00Z")
+
+        self.assertEqual(result, state)
+
+    @patch("tap_ms_dynamics_365_crm.streams.abstracts.write_record")
+    @patch("tap_ms_dynamics_365_crm.streams.abstracts.write_bookmark")
+    @patch("tap_ms_dynamics_365_crm.streams.abstracts.get_bookmark")
+    def test_sync_writes_selected_records_and_syncs_children(
+        self, mock_get_bookmark, mock_write_bookmark, mock_write_record
+    ):
+        mock_get_bookmark.return_value = "2024-01-01T00:00:00Z"
+        mock_write_bookmark.return_value = {"bookmarks": {}}
+
+        stream = self._make_stream(tap_stream_id="incident")
+        stream.replication_keys = ["modifiedon"]
+        stream.key_properties = ["incidentid"]
+        stream.catalog = MagicMock()
+
+        record = {"incidentid": "1", "modifiedon": "2024-06-01T00:00:00Z"}
+        mock_child = MagicMock()
+        stream.child_to_sync = [mock_child]
+
+        mock_transformer = MagicMock()
+        mock_transformer.transform.return_value = record
+
+        with patch.object(stream, "get_records", return_value=iter([record])), \
+                patch("tap_ms_dynamics_365_crm.streams.abstracts.metadata.get", return_value=True):
+            result = stream.sync(state={}, transformer=mock_transformer)
+
+        mock_write_record.assert_called_once_with("incident", record)
+        mock_child.sync.assert_called_once_with(state={}, transformer=mock_transformer, parent_obj=record)
+        mock_write_bookmark.assert_called_once()
+        self.assertEqual(result, 1)
+
+
+class TestFullTableStreamSync(unittest.TestCase):
+    """Test FullTableStream.sync"""
+
+    @patch("tap_ms_dynamics_365_crm.streams.abstracts.write_record")
+    def test_sync_writes_selected_records_and_syncs_children(self, mock_write_record):
+        client = MagicMock()
+        client.max_pagesize = 5000
+        client.base_url = "https://org.api.crm.dynamics.com/api/data/v9.2"
+
+        stream = FullTableStream(client=client)
+        stream.tap_stream_id = "competitor"
+        stream.path = "competitors"
+        stream.catalog = MagicMock()
+
+        record = {"competitorid": "1"}
+        mock_child = MagicMock()
+        stream.child_to_sync = [mock_child]
+
+        mock_transformer = MagicMock()
+        mock_transformer.transform.return_value = record
+
+        with patch.object(stream, "get_records", return_value=iter([record])), \
+                patch("tap_ms_dynamics_365_crm.streams.abstracts.metadata.get", return_value=True):
+            result = stream.sync(state={}, transformer=mock_transformer)
+
+        mock_write_record.assert_called_once_with("competitor", record)
+        mock_child.sync.assert_called_once_with(state={}, transformer=mock_transformer, parent_obj=record)
+        self.assertEqual(result, 1)
+
+
+class TestParentBaseStream(unittest.TestCase):
+    """Test ParentBaseStream.get_bookmark and ParentBaseStream.write_bookmark"""
+
+    def _make_parent(self):
+        from tap_ms_dynamics_365_crm.streams.abstracts import ParentBaseStream
+
+        client = MagicMock()
+        client.max_pagesize = 5000
+        client.config = {"start_date": "2024-01-01T00:00:00Z"}
+        parent = ParentBaseStream(client=client)
+        parent.tap_stream_id = "account"
+        parent.replication_keys = ["modifiedon"]
+        parent.catalog = MagicMock()
+        return parent
+
+    @patch("tap_ms_dynamics_365_crm.streams.abstracts.get_bookmark")
+    def test_get_bookmark_merges_own_and_child_bookmarks(self, mock_get_bookmark):
+        parent = self._make_parent()
+        child = MagicMock()
+        child.tap_stream_id = "contact"
+        parent.child_to_sync = [child]
+
+        mock_get_bookmark.side_effect = ["2024-06-01T00:00:00Z", "2024-01-01T00:00:00Z"]
+
+        with patch("tap_ms_dynamics_365_crm.streams.abstracts.metadata.get", return_value=True):
+            result = parent.get_bookmark({}, "account")
+
+        self.assertEqual(result, "2024-01-01T00:00:00Z")
+
+    @patch("tap_ms_dynamics_365_crm.streams.abstracts.write_bookmark")
+    def test_write_bookmark_writes_own_and_child_bookmarks(self, mock_write_bookmark):
+        parent = self._make_parent()
+        child = MagicMock()
+        child.tap_stream_id = "contact"
+        parent.child_to_sync = [child]
+
+        with patch("tap_ms_dynamics_365_crm.streams.abstracts.metadata.get", return_value=True):
+            result = parent.write_bookmark({}, "account", value="2024-06-01T00:00:00Z")
+
+        self.assertEqual(mock_write_bookmark.call_count, 2)
+        self.assertEqual(result, {})
+
+
+class TestChildBaseStream(unittest.TestCase):
+    """Test ChildBaseStream.get_url_endpoint and ChildBaseStream.get_bookmark"""
+
+    def _make_child(self):
+        from tap_ms_dynamics_365_crm.streams.abstracts import ChildBaseStream
+
+        client = MagicMock()
+        client.max_pagesize = 5000
+        client.config = {"start_date": "2024-01-01T00:00:00Z"}
+        client.base_url = "https://org.api.crm.dynamics.com/api/data/v9.2"
+        child = ChildBaseStream(client=client)
+        child.tap_stream_id = "contact"
+        child.path = "accounts({})/contacts"
+        child.replication_keys = ["modifiedon"]
+        return child
+
+    def test_get_url_endpoint_formats_parent_id_into_path(self):
+        child = self._make_child()
+
+        endpoint = child.get_url_endpoint(parent_obj={"id": "abc-123"})
+
+        self.assertEqual(
+            endpoint, "https://org.api.crm.dynamics.com/api/data/v9.2/accounts(abc-123)/contacts"
+        )
+
+    @patch("tap_ms_dynamics_365_crm.streams.abstracts.get_bookmark")
+    def test_get_bookmark_caches_value_across_calls(self, mock_get_bookmark):
+        child = self._make_child()
+        mock_get_bookmark.return_value = "2024-01-01T00:00:00Z"
+
+        first = child.get_bookmark({}, "contact")
+        second = child.get_bookmark({}, "contact")
+
+        self.assertEqual(first, "2024-01-01T00:00:00Z")
+        self.assertEqual(second, "2024-01-01T00:00:00Z")
+        mock_get_bookmark.assert_called_once()

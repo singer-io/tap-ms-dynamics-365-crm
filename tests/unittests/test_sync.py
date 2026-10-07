@@ -82,12 +82,20 @@ class TestSync(unittest.TestCase):
         self.assertEqual(result.schema, {"type": "object"})
         self.assertEqual(result.metadata, {"key": "value"})
 
+    def test_get_stream_object_raises_key_error_when_stream_not_found(self):
+        """Test get_stream_object raises KeyError for an unknown stream name"""
+        streams = {"known_stream": MagicMock()}
+        catalog = self._create_mock_catalog()
+
+        with self.assertRaises(KeyError):
+            get_stream_object(streams, catalog, "unknown_stream")
+
     @patch("tap_ms_dynamics_365_crm.sync.get_streams")
     @patch("singer.write_schema")
     @patch("singer.get_currently_syncing")
     @patch("singer.Transformer")
     @patch("singer.write_state")
-    def test_sync_stream1_called(self, mock_write_state, mock_transformer, 
+    def test_sync_stream1_called(self, mock_write_state, mock_transformer,
                                  mock_get_currently_syncing, mock_write_schema, mock_get_streams):
         # Create mock streams
         mock_get_streams.return_value = {
