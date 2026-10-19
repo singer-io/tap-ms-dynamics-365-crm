@@ -95,6 +95,57 @@ EXPECTED_METADATA_RAW = json.loads('''
         "obeys_start_date": true,
         "api_limit": 100
     },
+    "campaign": {
+        "primary_keys": [
+            "campaignid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "campaignactivity": {
+        "primary_keys": [
+            "activityid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "campaignactivityitem": {
+        "primary_keys": [
+            "campaignactivityitemid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "campaignitem": {
+        "primary_keys": [
+            "campaignitemid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "campaignresponse": {
+        "primary_keys": [
+            "activityid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
     "competitor": {
         "primary_keys": [
             "competitorid"
@@ -278,9 +329,11 @@ EXPECTED_METADATA_RAW = json.loads('''
         "primary_keys": [
             "activityid"
         ],
-        "replication_method": "FULL_TABLE",
-        "replication_keys": [],
-        "obeys_start_date": false,
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
         "api_limit": 100
     },
     "invoice": {
@@ -359,6 +412,28 @@ EXPECTED_METADATA_RAW = json.loads('''
         ],
         "obeys_start_date": true,
         "api_limit": 5
+    },
+    "list": {
+        "primary_keys": [
+            "listid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "listmember": {
+        "primary_keys": [
+            "listmemberid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
     },
     "msdyn_actual": {
         "primary_keys": [
@@ -441,9 +516,11 @@ EXPECTED_METADATA_RAW = json.loads('''
         "primary_keys": [
             "activityid"
         ],
-        "replication_method": "FULL_TABLE",
-        "replication_keys": [],
-        "obeys_start_date": false,
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
         "api_limit": 100
     },
     "msdyn_bookingalertstatus": {
@@ -1559,9 +1636,11 @@ EXPECTED_METADATA_RAW = json.loads('''
         "primary_keys": [
             "activityid"
         ],
-        "replication_method": "FULL_TABLE",
-        "replication_keys": [],
-        "obeys_start_date": false,
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
         "api_limit": 100
     },
     "sla": {
@@ -1627,9 +1706,9 @@ EXPECTED_METADATA_RAW = json.loads('''
     },
     "appointment": {
         "primary_keys": ["activityid"],
-        "replication_method": "FULL_TABLE",
-        "replication_keys": [],
-        "obeys_start_date": false,
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
         "api_limit": 100
     },
     "bookingstatus": {
@@ -1669,9 +1748,9 @@ EXPECTED_METADATA_RAW = json.loads('''
     },
     "email": {
         "primary_keys": ["activityid"],
-        "replication_method": "FULL_TABLE",
-        "replication_keys": [],
-        "obeys_start_date": false,
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
         "api_limit": 100
     },
     "leadaddress": {
@@ -1788,23 +1867,23 @@ EXPECTED_METADATA_RAW = json.loads('''
     },
     "msfp_surveyinvite": {
         "primary_keys": ["activityid"],
-        "replication_method": "FULL_TABLE",
-        "replication_keys": [],
-        "obeys_start_date": false,
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
         "api_limit": 100
     },
     "msfp_surveyresponse": {
         "primary_keys": ["activityid"],
-        "replication_method": "FULL_TABLE",
-        "replication_keys": [],
-        "obeys_start_date": false,
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
         "api_limit": 100
     },
     "opportunityclose": {
         "primary_keys": ["activityid"],
-        "replication_method": "FULL_TABLE",
-        "replication_keys": [],
-        "obeys_start_date": false,
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
         "api_limit": 100
     },
     "opportunitycompetitors": {
@@ -1823,30 +1902,30 @@ EXPECTED_METADATA_RAW = json.loads('''
     },
     "orderclose": {
         "primary_keys": ["activityid"],
-        "replication_method": "FULL_TABLE",
-        "replication_keys": [],
-        "obeys_start_date": false,
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
         "api_limit": 100
     },
     "phonecall": {
         "primary_keys": ["activityid"],
-        "replication_method": "FULL_TABLE",
-        "replication_keys": [],
-        "obeys_start_date": false,
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
         "api_limit": 100
     },
     "quoteclose": {
         "primary_keys": ["activityid"],
-        "replication_method": "FULL_TABLE",
-        "replication_keys": [],
-        "obeys_start_date": false,
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
         "api_limit": 100
     },
     "recurringappointmentmaster": {
         "primary_keys": ["activityid"],
-        "replication_method": "FULL_TABLE",
-        "replication_keys": [],
-        "obeys_start_date": false,
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
         "api_limit": 100
     },
     "systemuser": {
@@ -1858,9 +1937,9 @@ EXPECTED_METADATA_RAW = json.loads('''
     },
     "task": {
         "primary_keys": ["activityid"],
-        "replication_method": "FULL_TABLE",
-        "replication_keys": [],
-        "obeys_start_date": false,
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
         "api_limit": 100
     },
     "team": {

@@ -247,6 +247,15 @@ INCLUDED_ENTITIES = {
         'msfp_surveyresponse',
         'msfp_question',
         'msfp_questionresponse'
+    },
+    "outbound_campaign_marketing": {
+        'campaign',
+        'campaignactivity',
+        'campaignresponse',
+        'campaignitem',
+        'campaignactivityitem',
+        'list',
+        'listmember'
     }
 }
 

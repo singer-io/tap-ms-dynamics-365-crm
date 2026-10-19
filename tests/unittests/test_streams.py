@@ -233,6 +233,57 @@ class TestBuildEntityMetadata(unittest.TestCase):
         self.assertNotIn("contact", result_names)
 
 
+class TestGetStreamsInheritedReplicationKey(unittest.TestCase):
+    """Regression test: entities that only declare `modifiedon` on a `BaseType`
+    (e.g. activity types inheriting from `activitypointer`) must still be built
+    as INCREMENTAL streams, not FULL_TABLE, once inherited properties are
+    resolved from the real `$metadata` XML."""
+
+    METADATA_XML = '''<?xml version="1.0" encoding="utf-8"?>
+    <edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+        <edmx:DataServices>
+            <Schema Namespace="Microsoft.Dynamics.CRM" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+                <EntityType Name="activitypointer">
+                    <Key>
+                        <PropertyRef Name="activityid"/>
+                    </Key>
+                    <Property Name="activityid" Type="Edm.Guid"/>
+                    <Property Name="subject" Type="Edm.String"/>
+                    <Property Name="modifiedon" Type="Edm.DateTimeOffset"/>
+                </EntityType>
+                <EntityType Name="email" BaseType="Microsoft.Dynamics.CRM.activitypointer">
+                    <Key>
+                        <PropertyRef Name="activityid"/>
+                    </Key>
+                    <Property Name="activityid" Type="Edm.Guid"/>
+                    <Property Name="torecipients" Type="Edm.String"/>
+                </EntityType>
+            </Schema>
+        </edmx:DataServices>
+    </edmx:Edmx>'''
+
+    @patch('tap_ms_dynamics_365_crm.streams.streams.call_entity_definitions')
+    def test_derived_activity_entity_uses_incremental_replication(self, mock_call_entity_definitions):
+        mock_call_entity_definitions.return_value = [
+            {"LogicalName": "email", "IsCustomEntity": False, "IsManaged": True,
+             "EntitySetName": "emails"},
+        ]
+
+        client = MagicMock()
+        client.make_request.return_value = self.METADATA_XML
+        client.max_pagesize = 5000
+        client.config = {}
+
+        included_entities = {"field_service": {"email"}}
+        with patch('tap_ms_dynamics_365_crm.streams.INCLUDED_ENTITIES', included_entities), \
+             patch('tap_ms_dynamics_365_crm.streams.EXCLUDED_ENTITIES', set()):
+            streams = get_streams(client, create_schema=False)
+
+        self.assertIn("email", streams)
+        self.assertEqual(streams["email"].replication_method, "INCREMENTAL")
+        self.assertEqual(streams["email"].replication_keys, ["modifiedon"])
+
+
 class TestBuildSchema(unittest.TestCase):
     """Test build_schema's type mapping for each Dynamics EDM type family"""
 
