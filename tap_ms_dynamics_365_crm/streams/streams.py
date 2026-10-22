@@ -48,7 +48,7 @@ REPLICATION_TO_STREAM_MAP = {
 def call_entity_definitions(client: Client):
     """Calls the `EntityDefinitions` endpoint to get all entities."""
     params = {
-        "$select": "MetadataId,LogicalName,EntitySetName,IsCustomEntity,IsManaged",
+        "$select": "MetadataId,LogicalName,EntitySetName,IsCustomEntity,IsManaged,PrimaryIdAttribute",
         "$count": "true",
     }
 
@@ -76,6 +76,11 @@ def build_entity_metadata(client: Client, included_entities: dict):
         if ((is_custom and not is_managed) or is_included) and entity_name in entity_metadata:
             entity_metadata[entity_name]["LogicalName"] = entity_name
             entity_metadata[entity_name]["EntitySetName"] = entity.get("EntitySetName")
+            # EntityDefinitions' PrimaryIdAttribute is the authoritative primary
+            # key; fall back to the $metadata XML's <Key> only if it's absent.
+            entity_metadata[entity_name]["Key"] = (
+                entity.get("PrimaryIdAttribute") or entity_metadata[entity_name].get("Key")
+            )
             yield entity_metadata[entity_name]
 
 def get_streams(client: Client, create_schema: bool = True) -> dict:

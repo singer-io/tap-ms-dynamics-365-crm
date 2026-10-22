@@ -190,7 +190,7 @@ class TestCallEntityDefinitions(unittest.TestCase):
         client.make_request.assert_called_once_with(
             method='GET',
             params={
-                "$select": "MetadataId,LogicalName,EntitySetName,IsCustomEntity,IsManaged",
+                "$select": "MetadataId,LogicalName,EntitySetName,IsCustomEntity,IsManaged,PrimaryIdAttribute",
                 "$count": "true",
             },
             path='EntityDefinitions',
@@ -231,6 +231,51 @@ class TestBuildEntityMetadata(unittest.TestCase):
         self.assertIn("account", result_names)
         self.assertNotIn("not_in_metadata", result_names)
         self.assertNotIn("contact", result_names)
+
+    @patch('tap_ms_dynamics_365_crm.streams.streams.transform_metadata_xml')
+    @patch('tap_ms_dynamics_365_crm.streams.streams.call_entity_definitions')
+    def test_primary_id_attribute_overrides_xml_key(
+        self, mock_call_entity_definitions, mock_transform_metadata_xml
+    ):
+        """EntityDefinitions' PrimaryIdAttribute (e.g. 'systemuserid' for
+        systemuser) is authoritative and must override whatever Key the
+        $metadata XML parse produced."""
+        mock_call_entity_definitions.return_value = [
+            {"LogicalName": "systemuser", "IsCustomEntity": False, "IsManaged": True,
+             "EntitySetName": "systemusers", "PrimaryIdAttribute": "systemuserid"},
+        ]
+        mock_transform_metadata_xml.return_value = {
+            "systemuser": {"Key": "ownerid"},
+        }
+
+        client = MagicMock()
+        included_entities = {"org_core_metadata": {"systemuser"}}
+
+        results = list(build_entity_metadata(client, included_entities))
+
+        self.assertEqual(results[0]["Key"], "systemuserid")
+
+    @patch('tap_ms_dynamics_365_crm.streams.streams.transform_metadata_xml')
+    @patch('tap_ms_dynamics_365_crm.streams.streams.call_entity_definitions')
+    def test_xml_key_used_when_primary_id_attribute_missing(
+        self, mock_call_entity_definitions, mock_transform_metadata_xml
+    ):
+        """Falls back to the $metadata XML's Key if EntityDefinitions doesn't
+        return a PrimaryIdAttribute for some reason."""
+        mock_call_entity_definitions.return_value = [
+            {"LogicalName": "account", "IsCustomEntity": False, "IsManaged": True,
+             "EntitySetName": "accounts"},
+        ]
+        mock_transform_metadata_xml.return_value = {
+            "account": {"Key": "accountid"},
+        }
+
+        client = MagicMock()
+        included_entities = {"sales": {"account"}}
+
+        results = list(build_entity_metadata(client, included_entities))
+
+        self.assertEqual(results[0]["Key"], "accountid")
 
 
 class TestGetStreamsInheritedReplicationKey(unittest.TestCase):
