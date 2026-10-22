@@ -1929,7 +1929,7 @@ EXPECTED_METADATA_RAW = json.loads('''
         "api_limit": 100
     },
     "systemuser": {
-        "primary_keys": ["ownerid"],
+        "primary_keys": ["systemuserid"],
         "replication_method": "INCREMENTAL",
         "replication_keys": ["modifiedon"],
         "obeys_start_date": true,
@@ -1943,7 +1943,7 @@ EXPECTED_METADATA_RAW = json.loads('''
         "api_limit": 100
     },
     "team": {
-        "primary_keys": ["ownerid"],
+        "primary_keys": ["teamid"],
         "replication_method": "INCREMENTAL",
         "replication_keys": ["modifiedon"],
         "obeys_start_date": true,
