@@ -1,4 +1,6 @@
 """Test tap discovery mode and metadata."""
+import re
+
 from base import MSDynamics365CRMBaseTest
 from tap_tester.base_suite_tests.discovery_test import DiscoveryTest
 from tap_tester import menagerie
@@ -12,6 +14,34 @@ class MSDynamics365CRMDiscoveryTest(DiscoveryTest, MSDynamics365CRMBaseTest):
 
     def streams_to_test(self):
         return self.expected_stream_names()
+
+    # ---------------------------------------------------------------------- #
+    # Override: stream naming (allow digits for Dynamics CRM versioned        #
+    # marketing entities)                                                     #
+    # ---------------------------------------------------------------------- #
+
+    def test_stream_naming(self):
+        """Verify stream names use only lowercase letters, digits, and underscores.
+
+        The tap-tester base implementation uses ``[a-z_]+``, which rejects
+        digits. Some Dynamics 365 Marketing entity logical names legitimately
+        include version-number suffixes (e.g. ``msdynmkt_compliancesettings4``,
+        ``msdynmkt_contactpointconsent4``,
+        ``msdynmkt_msdynmkt_purpose_msdynmkt_compliancev4``). We broaden the
+        allowed charset to ``[a-z0-9_]+`` while keeping all other assertions
+        from the base class.
+        """
+        for stream in self.streams_to_test():
+            with self.subTest(stream=stream):
+                match = re.fullmatch(r"[a-z0-9_]+", stream)
+                self.assertIsNotNone(
+                    match,
+                    logging=f"verify {stream} is only lower case alpha, "
+                            f"digit, or underscore characters",
+                )
+                self.assertEqual(match.group(0), stream,
+                                 logging=f"verify {stream} is only lower case alpha, "
+                                         f"digit, or underscore characters")
 
     def test_parent_stream(self):
         """

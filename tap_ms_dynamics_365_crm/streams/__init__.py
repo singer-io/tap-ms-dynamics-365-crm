@@ -42,28 +42,61 @@ EXCLUDED_ENTITIES = {
 
 INCLUDED_ENTITIES = {
     # Sales Entities List
+    "org_core_metadata":{
+        'businessunit',
+        'systemuser',
+        'team',
+        'teammembership',
+        'territory',
+        'queue',
+        'queueitem',
+        'transactioncurrency'
+    },
     "sales": {
         'account',
+        'accountleads',
         'contact',
+        'contactleads',
         'lead',
+        'leadaddress',
+        'leadcompetitors',
+        'leadproduct',
+        'leadtoopportunitysalesprocess',
         'invoice',
         'invoicedetail',
         'opportunity',
         'opportunityproduct',
-        'product',
+        'opportunityclose',
+        'opportunitycompetitors',
+        'opportunitysalesprocess',
         'quote',
         'quotedetail',
+        'quoteclose',
         'salesorder',
         'salesorderdetail',
+        'orderclose',
+        'product',
         'competitor',
         'pricelevel',
         'productpricelevel',
+        'discount',
+        'discounttype',
         'salesliterature',
-        'salesliteratureitem'
+        'salesliteratureitem',
+        'uom',
+        'uomschedule'
     },
     # Field Service Entities List
     "field_service": {
         'msdyn_actual',
+        'appointment',
+        'recurringappointmentmaster',
+        'task',
+        'email',
+        'phonecall',
+        'activitypointer',
+        'activityparty',
+        'annotation',
         'msdyn_agreement',
         'msdyn_agreementbookingdate',
         'msdyn_agreementbookingincident',
@@ -155,7 +188,9 @@ INCLUDED_ENTITIES = {
         'msdyn_workorderservicetask',
         'msdyn_workordersubstatus',
         'msdyn_workordertype',
-        'msdyn_workhourtemplate'
+        'msdyn_workhourtemplate',
+        'msdyn_customerasset',
+        'msdyn_customerassetcategory'
     },
     # Customer Service entities List
     "customer_service": {
@@ -194,7 +229,33 @@ INCLUDED_ENTITIES = {
         'bookableresourcegroup',
         'feedback',
         'phonetocaseprocess',
-        'msdyn_slakpi'
+        'msdyn_slakpi',
+        'bookingstatus'
+    },
+    "customer_consent": {
+        'msdynmkt_contactpointconsent4',
+        'msdynmkt_purpose',
+        'msdynmkt_topic',
+        'msdynmkt_compliancesettings4',
+        'msdyn_segment',
+        'msdynmkt_preferencecenter',
+        'msdynmkt_msdynmkt_purpose_msdynmkt_compliancev4'
+    },
+    "customer_voice": {
+        'msfp_survey',
+        'msfp_surveyinvite',
+        'msfp_surveyresponse',
+        'msfp_question',
+        'msfp_questionresponse'
+    },
+    "outbound_campaign_marketing": {
+        'campaign',
+        'campaignactivity',
+        'campaignresponse',
+        'campaignitem',
+        'campaignactivityitem',
+        'list',
+        'listmember'
     }
 }
 

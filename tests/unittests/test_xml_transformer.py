@@ -194,3 +194,96 @@ class TestXmlTransformer(unittest.TestCase):
         """Test that namespace constants are correctly defined"""
         self.assertEqual(NS['edmx'], 'http://docs.oasis-open.org/odata/ns/edmx')
         self.assertEqual(NS['edm'], 'http://docs.oasis-open.org/odata/ns/edm')
+
+    def test_transform_metadata_xml_resolves_inherited_properties_from_base_type(self):
+        """Derived activity entity types (e.g. `email`) only declare their own
+        properties in `$metadata`, while common fields like `modifiedon` are
+        declared on the `BaseType` entity (`activitypointer`). Those inherited
+        fields must be merged onto the derived entity so callers (and
+        `get_streams`) can see `modifiedon` and select INCREMENTAL replication."""
+        xml = '''<?xml version="1.0" encoding="utf-8"?>
+        <edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+            <edmx:DataServices>
+                <Schema Namespace="Microsoft.Dynamics.CRM" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+                    <EntityType Name="activitypointer">
+                        <Key>
+                            <PropertyRef Name="activityid"/>
+                        </Key>
+                        <Property Name="activityid" Type="Edm.Guid"/>
+                        <Property Name="subject" Type="Edm.String"/>
+                        <Property Name="modifiedon" Type="Edm.DateTimeOffset"/>
+                    </EntityType>
+                    <EntityType Name="email" BaseType="Microsoft.Dynamics.CRM.activitypointer">
+                        <Key>
+                            <PropertyRef Name="activityid"/>
+                        </Key>
+                        <Property Name="activityid" Type="Edm.Guid"/>
+                        <Property Name="torecipients" Type="Edm.String"/>
+                    </EntityType>
+                </Schema>
+            </edmx:DataServices>
+        </edmx:Edmx>'''
+
+        result = transform_metadata_xml(xml)
+
+        prop_names = {p['LogicalName'] for p in result['email']['Properties']}
+        self.assertIn('torecipients', prop_names, "own property should still be present")
+        self.assertIn('modifiedon', prop_names, "inherited property should be merged in")
+        self.assertIn('subject', prop_names, "inherited property should be merged in")
+        # Own `activityid` declaration should not be duplicated by the inherited one.
+        activityid_count = sum(1 for p in result['email']['Properties'] if p['LogicalName'] == 'activityid')
+        self.assertEqual(activityid_count, 1)
+
+    def test_transform_metadata_xml_derived_property_overrides_base_property(self):
+        """A property explicitly redeclared on the derived entity should win over
+        the inherited copy from its `BaseType`, rather than being duplicated."""
+        xml = '''<?xml version="1.0" encoding="utf-8"?>
+        <edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+            <edmx:DataServices>
+                <Schema Namespace="Microsoft.Dynamics.CRM" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+                    <EntityType Name="activitypointer">
+                        <Key>
+                            <PropertyRef Name="activityid"/>
+                        </Key>
+                        <Property Name="activityid" Type="Edm.Guid"/>
+                        <Property Name="modifiedon" Type="Edm.DateTimeOffset"/>
+                    </EntityType>
+                    <EntityType Name="task" BaseType="Microsoft.Dynamics.CRM.activitypointer">
+                        <Key>
+                            <PropertyRef Name="activityid"/>
+                        </Key>
+                        <Property Name="activityid" Type="Edm.Guid"/>
+                        <Property Name="modifiedon" Type="Edm.String"/>
+                    </EntityType>
+                </Schema>
+            </edmx:DataServices>
+        </edmx:Edmx>'''
+
+        result = transform_metadata_xml(xml)
+
+        modifiedon_props = [p for p in result['task']['Properties'] if p['LogicalName'] == 'modifiedon']
+        self.assertEqual(len(modifiedon_props), 1)
+        self.assertEqual(modifiedon_props[0]['PropertyType'], 'Edm.String')
+
+    def test_transform_metadata_xml_missing_base_type_entity_does_not_crash(self):
+        """If `BaseType` points to an entity that isn't captured (e.g. filtered
+        out for lacking its own `Key`), inheritance resolution should skip it
+        gracefully instead of raising."""
+        xml = '''<?xml version="1.0" encoding="utf-8"?>
+        <edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+            <edmx:DataServices>
+                <Schema Namespace="Microsoft.Dynamics.CRM" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+                    <EntityType Name="orphan_child" BaseType="Microsoft.Dynamics.CRM.missing_base">
+                        <Key>
+                            <PropertyRef Name="orphan_childid"/>
+                        </Key>
+                        <Property Name="orphan_childid" Type="Edm.Guid"/>
+                    </EntityType>
+                </Schema>
+            </edmx:DataServices>
+        </edmx:Edmx>'''
+
+        result = transform_metadata_xml(xml)
+
+        prop_names = {p['LogicalName'] for p in result['orphan_child']['Properties']}
+        self.assertEqual(prop_names, {'orphan_childid'})

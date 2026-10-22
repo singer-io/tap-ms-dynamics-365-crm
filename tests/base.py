@@ -95,6 +95,57 @@ EXPECTED_METADATA_RAW = json.loads('''
         "obeys_start_date": true,
         "api_limit": 100
     },
+    "campaign": {
+        "primary_keys": [
+            "campaignid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "campaignactivity": {
+        "primary_keys": [
+            "activityid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "campaignactivityitem": {
+        "primary_keys": [
+            "campaignactivityitemid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "campaignitem": {
+        "primary_keys": [
+            "campaignitemid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "campaignresponse": {
+        "primary_keys": [
+            "activityid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
     "competitor": {
         "primary_keys": [
             "competitorid"
@@ -278,9 +329,11 @@ EXPECTED_METADATA_RAW = json.loads('''
         "primary_keys": [
             "activityid"
         ],
-        "replication_method": "FULL_TABLE",
-        "replication_keys": [],
-        "obeys_start_date": false,
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
         "api_limit": 100
     },
     "invoice": {
@@ -359,6 +412,28 @@ EXPECTED_METADATA_RAW = json.loads('''
         ],
         "obeys_start_date": true,
         "api_limit": 5
+    },
+    "list": {
+        "primary_keys": [
+            "listid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "listmember": {
+        "primary_keys": [
+            "listmemberid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
     },
     "msdyn_actual": {
         "primary_keys": [
@@ -441,9 +516,11 @@ EXPECTED_METADATA_RAW = json.loads('''
         "primary_keys": [
             "activityid"
         ],
-        "replication_method": "FULL_TABLE",
-        "replication_keys": [],
-        "obeys_start_date": false,
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
         "api_limit": 100
     },
     "msdyn_bookingalertstatus": {
@@ -1559,9 +1636,11 @@ EXPECTED_METADATA_RAW = json.loads('''
         "primary_keys": [
             "activityid"
         ],
-        "replication_method": "FULL_TABLE",
-        "replication_keys": [],
-        "obeys_start_date": false,
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
         "api_limit": 100
     },
     "sla": {
@@ -1594,6 +1673,314 @@ EXPECTED_METADATA_RAW = json.loads('''
         "replication_keys": [
             "modifiedon"
         ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "accountleads": {
+        "primary_keys": ["accountleadid"],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "activityparty": {
+        "primary_keys": ["activitypartyid"],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "activitypointer": {
+        "primary_keys": ["activityid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "annotation": {
+        "primary_keys": ["annotationid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "appointment": {
+        "primary_keys": ["activityid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "bookingstatus": {
+        "primary_keys": ["bookingstatusid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "businessunit": {
+        "primary_keys": ["businessunitid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "contactleads": {
+        "primary_keys": ["contactleadid"],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "discount": {
+        "primary_keys": ["discountid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "discounttype": {
+        "primary_keys": ["discounttypeid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "email": {
+        "primary_keys": ["activityid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "leadaddress": {
+        "primary_keys": ["leadaddressid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "leadcompetitors": {
+        "primary_keys": ["leadcompetitorid"],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "leadproduct": {
+        "primary_keys": ["leadproductid"],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "leadtoopportunitysalesprocess": {
+        "primary_keys": ["businessprocessflowinstanceid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_customerasset": {
+        "primary_keys": ["msdyn_customerassetid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_customerassetcategory": {
+        "primary_keys": ["msdyn_customerassetcategoryid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_segment": {
+        "primary_keys": ["msdyn_segmentid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdynmkt_compliancesettings4": {
+        "primary_keys": ["msdynmkt_compliancesettings4id"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdynmkt_msdynmkt_purpose_msdynmkt_compliancev4": {
+        "primary_keys": ["msdynmkt_msdynmkt_purpose_msdynmkt_compliancev4id"],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "msdynmkt_contactpointconsent4": {
+        "primary_keys": ["msdynmkt_contactpointconsent4id"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdynmkt_preferencecenter": {
+        "primary_keys": ["msdynmkt_preferencecenterid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdynmkt_purpose": {
+        "primary_keys": ["msdynmkt_purposeid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdynmkt_topic": {
+        "primary_keys": ["msdynmkt_topicid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msfp_question": {
+        "primary_keys": ["msfp_questionid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msfp_questionresponse": {
+        "primary_keys": ["msfp_questionresponseid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msfp_survey": {
+        "primary_keys": ["msfp_surveyid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msfp_surveyinvite": {
+        "primary_keys": ["activityid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msfp_surveyresponse": {
+        "primary_keys": ["activityid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "opportunityclose": {
+        "primary_keys": ["activityid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "opportunitycompetitors": {
+        "primary_keys": ["opportunitycompetitorid"],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "opportunitysalesprocess": {
+        "primary_keys": ["businessprocessflowinstanceid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "orderclose": {
+        "primary_keys": ["activityid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "phonecall": {
+        "primary_keys": ["activityid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "quoteclose": {
+        "primary_keys": ["activityid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "recurringappointmentmaster": {
+        "primary_keys": ["activityid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "systemuser": {
+        "primary_keys": ["systemuserid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "task": {
+        "primary_keys": ["activityid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "team": {
+        "primary_keys": ["teamid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "teammembership": {
+        "primary_keys": ["teammembershipid"],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "territory": {
+        "primary_keys": ["territoryid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "transactioncurrency": {
+        "primary_keys": ["transactioncurrencyid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "uom": {
+        "primary_keys": ["uomid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "uomschedule": {
+        "primary_keys": ["uomscheduleid"],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": ["modifiedon"],
         "obeys_start_date": true,
         "api_limit": 100
     }
