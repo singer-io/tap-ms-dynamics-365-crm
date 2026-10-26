@@ -14,7 +14,8 @@ from tap_ms_dynamics_365_crm.client import Client, MAX_PAGESIZE, AUTH_METHOD_AUT
 from tap_ms_dynamics_365_crm.exceptions import (
     MSDynamics365CrmError,
     MSDynamics365CrmForbiddenError,
-    MSDynamics365CrmNotFoundError
+    MSDynamics365CrmNotFoundError,
+    MSDynamics365CrmBadRequestError
 )
 
 LOGGER = get_logger()
@@ -260,6 +261,24 @@ class BaseStream(ABC):
                 self.tap_stream_id, str(exc),
             )
             return False
+        except MSDynamics365CrmBadRequestError as exc:
+            error_message = str(exc)
+            error_message_lower = error_message.lower()
+            if (
+                '0x80040224' in error_message_lower
+                or 'retrievemultiple isn\'t supported in non-admin scenarios'
+                in error_message_lower
+            ):
+                LOGGER.warning(
+                    "Non-admin access restriction for Stream: %s. "
+                    "RetrieveMultiple is not supported in non-admin scenarios; "
+                    "excluding from catalog. HTTP-Error-Message: '%s'",
+                    self.tap_stream_id,
+                    error_message,
+                )
+                return False
+
+            raise
 
     def _check_scoped_access(self, endpoint: str) -> bool:
         """
