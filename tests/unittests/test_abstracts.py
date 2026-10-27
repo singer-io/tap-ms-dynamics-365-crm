@@ -73,9 +73,20 @@ class TestBaseStreamCheckAccess(unittest.TestCase):
             error_message,
         )
 
+    def test_check_access_excludes_bare_caller_not_allowed_message(self):
+        stream, client = self._make_stream(tap_stream_id="unstructuredfilesearchentity")
+        client.make_request.side_effect = MSDynamics365CrmBadRequestError(
+            "HTTP-error-code: 400, Error Code: 0x80040265, Error: "
+            "Caller is not allowed to perform this operation"
+        )
+
+        self.assertFalse(stream.check_access())
+
     def test_check_access_does_not_mislabel_other_bad_requests_as_permission_denials(self):
         messages = [
             "HTTP-error-code: 400, Error Code: 0x80040265, Error: Custom validation failed.",
+            "HTTP-error-code: 400, Error Code: 0x80040265, Error: "
+            "The caller is not allowed to perform this operation.",
             "HTTP-error-code: 400, Error Code: 0x80000000, Error: "
             "AuthenticatedUserId test-user does not have access to invoke RetrieveMultiple.",
         ]

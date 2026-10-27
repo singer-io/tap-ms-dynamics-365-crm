@@ -267,8 +267,12 @@ class BaseStream(ABC):
             error_message_lower = error_message.lower()
             if (
                 '0x80040265' in error_message_lower
-                and ('does not have access to invoke retrievemultiple' in error_message_lower
-                     or 'caller is not allowed to perform this operation' in error_message_lower)
+                and (
+                    'does not have access to invoke retrievemultiple' in error_message_lower
+                    # Bare platform message; ISV validation text wraps or extends it.
+                    or error_message_lower.rstrip(' .\n').endswith(
+                        'error: caller is not allowed to perform this operation')
+                )
             ):
                 LOGGER.warning(
                     "Unauthorized Stream: %s, excluding from catalog. "
