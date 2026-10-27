@@ -1,6 +1,10 @@
 import singer
 
-from tap_ms_dynamics_365_crm.client import Client
+from tap_ms_dynamics_365_crm.client import (
+    AUTH_METHOD_AUTHORIZATION_CODE,
+    AUTH_METHOD_CLIENT_CREDENTIALS,
+    Client,
+)
 from tap_ms_dynamics_365_crm.xml_transformer import (
     flatten_entity_attributes,
     transform_metadata_xml
@@ -45,10 +49,20 @@ REPLICATION_TO_STREAM_MAP = {
     'FULL_TABLE': FullTableStream
 }
 
+AUTHORIZATION_CODE_ONLY_STREAMS = {
+    'aaduser',
+    'gitorganization',
+    'sensitivitylabel',
+    'sharedworkspaceaccesstoken2'
+}
+
 def call_entity_definitions(client: Client):
     """Calls the `EntityDefinitions` endpoint to get all entities."""
     params = {
-        "$select": "MetadataId,LogicalName,EntitySetName,IsCustomEntity,IsManaged,PrimaryIdAttribute",
+        "$select": (
+            "MetadataId,LogicalName,EntitySetName,IsCustomEntity,IsManaged,"
+            "PrimaryIdAttribute"
+        ),
         "$count": "true",
     }
 
@@ -91,7 +105,9 @@ def get_streams(client: Client, create_schema: bool = True) -> dict:
         client: MS Dynamics client instance
         create_schema: Flag to control schema creation (default: True)
     """
-    from tap_ms_dynamics_365_crm.streams import INCLUDED_ENTITIES, EXCLUDED_ENTITIES
+    from tap_ms_dynamics_365_crm.streams import (
+        INCLUDED_ENTITIES, EXCLUDED_ENTITIES, CLIENT_CREDENTIALS_ONLY_STREAMS,
+    )
     included_entities = INCLUDED_ENTITIES
     excluded_entities = EXCLUDED_ENTITIES
 
@@ -105,6 +121,26 @@ def get_streams(client: Client, create_schema: bool = True) -> dict:
         stream_endpoint = stream.get('EntitySetName') or ''
         stream_key = stream.get('Key')
         LOGGER.info('Processing stream: {}'.format(stream_name))
+
+        if (
+            stream_name in CLIENT_CREDENTIALS_ONLY_STREAMS
+            and client.auth_method != AUTH_METHOD_CLIENT_CREDENTIALS
+        ):
+            LOGGER.info(
+                "Skipping stream '%s': it requires client_credentials auth_method.",
+                stream_name,
+            )
+            continue
+
+        if (
+            stream_name in AUTHORIZATION_CODE_ONLY_STREAMS
+            and client.auth_method != AUTH_METHOD_AUTHORIZATION_CODE
+        ):
+            LOGGER.info(
+                "Skipping stream '%s': it requires authorization_code auth_method.",
+                stream_name,
+            )
+            continue
 
         # skip over any streams that don't have a name or are in EXCLUDED_ENTITIES
         if not stream_name or stream_name in excluded_entities:

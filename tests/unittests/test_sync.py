@@ -1,6 +1,9 @@
 import unittest
 from unittest.mock import patch, MagicMock
 from tap_ms_dynamics_365_crm.sync import write_schema, sync, update_currently_syncing, get_stream_object
+from tap_ms_dynamics_365_crm.client import (
+    AUTH_METHOD_AUTHORIZATION_CODE, AUTH_METHOD_CLIENT_CREDENTIALS,
+)
 
 class TestSync(unittest.TestCase):
 
@@ -90,6 +93,16 @@ class TestSync(unittest.TestCase):
         with self.assertRaises(KeyError):
             get_stream_object(streams, catalog, "unknown_stream")
 
+    @patch("tap_ms_dynamics_365_crm.sync.get_streams", return_value={})
+    def test_sync_skips_client_credentials_stream_under_authorization_code(self, mock_get_streams):
+        catalog = MagicMock()
+        catalog.get_selected_streams.return_value = [MagicMock(stream="aiplugin")]
+        client = MagicMock(auth_method=AUTH_METHOD_AUTHORIZATION_CODE)
+        with self.assertLogs('root', level='WARNING') as logs:
+            sync(client, {}, catalog, {})
+        catalog.get_stream.assert_not_called()
+        self.assertTrue(any("requires client_credentials" in message for message in logs.output))
+
     @patch("tap_ms_dynamics_365_crm.sync.get_streams")
     @patch("singer.write_schema")
     @patch("singer.get_currently_syncing")
@@ -118,6 +131,35 @@ class TestSync(unittest.TestCase):
         # Both streams should be synced
         self.assertEqual(mock_get_streams.return_value["invoices"].sync.call_count, 1)
         self.assertEqual(mock_get_streams.return_value["expenses"].sync.call_count, 1)
+
+    @patch("tap_ms_dynamics_365_crm.sync.get_streams")
+    @patch("singer.write_schema")
+    @patch("singer.get_currently_syncing")
+    @patch("singer.Transformer")
+    @patch("singer.write_state")
+    def test_sync_skips_aaduser_from_client_credentials_catalog(
+        self, mock_write_state, mock_transformer, mock_get_currently_syncing,
+        mock_write_schema, mock_get_streams
+    ):
+        account_stream = self._create_mock_stream(parent=None)
+        mock_get_streams.return_value = {"account": account_stream}
+
+        catalog = MagicMock()
+        catalog.get_selected_streams.return_value = [
+            MagicMock(stream="aaduser"),
+            MagicMock(stream="account"),
+        ]
+        catalog.get_stream.side_effect = lambda name: MagicMock(
+            schema=MagicMock(to_dict=lambda: {}),
+            metadata=[],
+        )
+        client = MagicMock()
+        client.auth_method = AUTH_METHOD_CLIENT_CREDENTIALS
+
+        sync(client, {}, catalog, {})
+
+        self.assertEqual(account_stream.sync.call_count, 1)
+        catalog.get_stream.assert_called_once_with("account")
 
     @patch("tap_ms_dynamics_365_crm.sync.get_streams")
     @patch("singer.write_schema")

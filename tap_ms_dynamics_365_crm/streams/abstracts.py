@@ -31,7 +31,7 @@ LOGGER = get_logger()
 # fine, so this scoping is skipped entirely for that auth method.
 SCOPED_ACCESS_CHECK_ENTITIES = {
     'msdyn_requirementdependency',
-    'msdyn_incidenttypessetup',
+    'msdyn_incidenttypessetup'
 }
 
 
@@ -48,7 +48,7 @@ class BaseStream(ABC):
 
     url_endpoint = ""
     path = ""
-    page_size = 100
+    page_size = MAX_PAGESIZE
     parent = ""
     data_key = "value"
     parent_bookmark_key = ""
@@ -241,6 +241,7 @@ class BaseStream(ABC):
         stream's entity set. Returns False when the entity set isn't plainly
         queryable via a simple GET:
          - 403 Forbidden: credentials lack access to the entity.
+         - 400 Bad Request with a RetrieveMultiple permission denial.
 
         Entities in SCOPED_ACCESS_CHECK_ENTITIES (under authorization_code)
         skip the plain GET entirely and are verified via _check_scoped_access
@@ -265,8 +266,22 @@ class BaseStream(ABC):
             error_message = str(exc)
             error_message_lower = error_message.lower()
             if (
+                '0x80040265' in error_message_lower
+                and ('does not have access to invoke retrievemultiple' in error_message_lower
+                     or 'caller is not allowed to perform this operation' in error_message_lower)
+            ):
+                LOGGER.warning(
+                    "Unauthorized Stream: %s, excluding from catalog. "
+                    "Credentials do not have access to invoke RetrieveMultiple. "
+                    "HTTP-Error-Message: '%s'",
+                    self.tap_stream_id,
+                    error_message,
+                )
+                return False
+
+            if (
                 '0x80040224' in error_message_lower
-                or 'retrievemultiple isn\'t supported in non-admin scenarios'
+                and 'retrievemultiple isn\'t supported in non-admin scenarios'
                 in error_message_lower
             ):
                 LOGGER.warning(

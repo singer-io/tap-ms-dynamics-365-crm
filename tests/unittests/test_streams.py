@@ -8,7 +8,12 @@ from tap_ms_dynamics_365_crm.streams.streams import (
     build_schema,
 )
 from tap_ms_dynamics_365_crm.streams.abstracts import BaseStream
+from tap_ms_dynamics_365_crm.client import (
+    AUTH_METHOD_AUTHORIZATION_CODE,
+    AUTH_METHOD_CLIENT_CREDENTIALS,
+)
 from tap_ms_dynamics_365_crm.exceptions import MSDynamics365CrmForbiddenError
+from tap_ms_dynamics_365_crm.streams import CLIENT_CREDENTIALS_ONLY_STREAMS, INCLUDED_ENTITIES
 
 
 class TestGetStreamsAccessFiltering(unittest.TestCase):
@@ -22,6 +27,34 @@ class TestGetStreamsAccessFiltering(unittest.TestCase):
             "Key": key,
             "Properties": {},
         }
+
+    @patch.object(BaseStream, 'check_access', autospec=True, return_value=True)
+    @patch('tap_ms_dynamics_365_crm.streams.streams.build_entity_metadata')
+    @patch('tap_ms_dynamics_365_crm.streams.streams.flatten_entity_attributes')
+    def test_guid_error_streams_require_client_credentials(
+        self, mock_flatten, mock_build_entity_metadata, mock_check_access
+    ):
+        self.assertEqual(len(CLIENT_CREDENTIALS_ONLY_STREAMS), 464)
+        self.assertEqual(
+            INCLUDED_ENTITIES["client_credentials_entities"],
+            CLIENT_CREDENTIALS_ONLY_STREAMS,
+        )
+        mock_build_entity_metadata.return_value = [
+            self._entity(name) for name in sorted(CLIENT_CREDENTIALS_ONLY_STREAMS)
+        ]
+        mock_flatten.return_value = {'modifiedon': {'type': 'Edm.DateTimeOffset'}}
+        for auth_method in (AUTH_METHOD_AUTHORIZATION_CODE, AUTH_METHOD_CLIENT_CREDENTIALS):
+            for create_schema in (True, False):
+                with self.subTest(auth_method=auth_method, create_schema=create_schema):
+                    client = MagicMock(max_pagesize=5000, auth_method=auth_method)
+                    client.config = {}
+                    streams = get_streams(client, create_schema=create_schema)
+                    self.assertEqual(
+                        set(streams),
+                        CLIENT_CREDENTIALS_ONLY_STREAMS
+                        if auth_method == AUTH_METHOD_CLIENT_CREDENTIALS else set(),
+                    )
+        self.assertEqual(mock_check_access.call_count, 464)
 
     @patch.object(BaseStream, 'check_access', autospec=True)
     @patch('tap_ms_dynamics_365_crm.streams.streams.build_entity_metadata')
@@ -39,6 +72,7 @@ class TestGetStreamsAccessFiltering(unittest.TestCase):
         client = MagicMock()
         client.max_pagesize = 5000
         client.config = {}
+        client.auth_method = AUTH_METHOD_AUTHORIZATION_CODE
         streams = get_streams(client, create_schema=True)
 
         self.assertNotIn('aaduser', streams)
@@ -83,6 +117,7 @@ class TestGetStreamsAccessFiltering(unittest.TestCase):
         client = MagicMock()
         client.max_pagesize = 5000
         client.config = {}
+        client.auth_method = AUTH_METHOD_AUTHORIZATION_CODE
 
         with self.assertLogs('root', level='WARNING') as log:
             streams = get_streams(client, create_schema=True)
@@ -110,9 +145,35 @@ class TestGetStreamsAccessFiltering(unittest.TestCase):
         client = MagicMock()
         client.max_pagesize = 5000
         client.config = {}
+        client.auth_method = AUTH_METHOD_AUTHORIZATION_CODE
 
         with self.assertRaises(MSDynamics365CrmForbiddenError):
             get_streams(client, create_schema=True)
+
+    @patch.object(BaseStream, 'check_access', autospec=True, return_value=True)
+    @patch('tap_ms_dynamics_365_crm.streams.streams.build_entity_metadata')
+    @patch('tap_ms_dynamics_365_crm.streams.streams.flatten_entity_attributes')
+    def test_aaduser_is_only_available_with_authorization_code(
+        self, mock_flatten, mock_build_entity_metadata, mock_check_access
+    ):
+        mock_build_entity_metadata.return_value = [self._entity('aaduser')]
+        mock_flatten.return_value = {'modifiedon': {'type': 'Edm.DateTimeOffset'}}
+
+        for auth_method, expected in (
+            (AUTH_METHOD_AUTHORIZATION_CODE, True),
+            (AUTH_METHOD_CLIENT_CREDENTIALS, False),
+        ):
+            for create_schema in (True, False):
+                client = MagicMock()
+                client.max_pagesize = 5000
+                client.config = {}
+                client.auth_method = auth_method
+
+                streams = get_streams(client, create_schema=create_schema)
+
+                self.assertEqual('aaduser' in streams, expected)
+
+        self.assertEqual(mock_check_access.call_count, 1)
 
     @patch('tap_ms_dynamics_365_crm.streams.streams.build_entity_metadata')
     @patch('tap_ms_dynamics_365_crm.streams.streams.flatten_entity_attributes')
@@ -190,7 +251,10 @@ class TestCallEntityDefinitions(unittest.TestCase):
         client.make_request.assert_called_once_with(
             method='GET',
             params={
-                "$select": "MetadataId,LogicalName,EntitySetName,IsCustomEntity,IsManaged,PrimaryIdAttribute",
+                "$select": (
+                    "MetadataId,LogicalName,EntitySetName,IsCustomEntity,IsManaged,"
+                    "PrimaryIdAttribute"
+                ),
                 "$count": "true",
             },
             path='EntityDefinitions',

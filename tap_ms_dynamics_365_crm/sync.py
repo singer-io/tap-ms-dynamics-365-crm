@@ -1,7 +1,12 @@
 import singer
 from typing import Dict
-from tap_ms_dynamics_365_crm.client import Client
-from tap_ms_dynamics_365_crm.streams import get_streams
+from tap_ms_dynamics_365_crm.client import (
+    AUTH_METHOD_AUTHORIZATION_CODE,
+    AUTH_METHOD_CLIENT_CREDENTIALS,
+    Client,
+)
+from tap_ms_dynamics_365_crm.streams import get_streams, CLIENT_CREDENTIALS_ONLY_STREAMS
+from tap_ms_dynamics_365_crm.streams.streams import AUTHORIZATION_CODE_ONLY_STREAMS
 
 
 LOGGER = singer.get_logger()
@@ -63,6 +68,24 @@ def sync(client: Client, config: Dict, catalog: singer.Catalog, state) -> None:
     streams = get_streams(client, create_schema=False)
     streams_to_sync = []
     for stream in catalog.get_selected_streams(state):
+        if (
+            stream.stream in CLIENT_CREDENTIALS_ONLY_STREAMS
+            and client.auth_method != AUTH_METHOD_CLIENT_CREDENTIALS
+        ):
+            LOGGER.warning(
+                "Skipping selected stream '%s': it requires client_credentials auth_method.",
+                stream.stream,
+            )
+            continue
+        if (
+            stream.stream in AUTHORIZATION_CODE_ONLY_STREAMS
+            and client.auth_method != AUTH_METHOD_AUTHORIZATION_CODE
+        ):
+            LOGGER.warning(
+                "Skipping selected stream '%s': it requires authorization_code auth_method.",
+                stream.stream,
+            )
+            continue
         streams_to_sync.append(stream.stream)
     LOGGER.info("selected_streams: {}".format(streams_to_sync))
 

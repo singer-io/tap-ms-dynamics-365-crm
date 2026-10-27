@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch, call
 from tap_ms_dynamics_365_crm.streams.abstracts import BaseStream, IncrementalStream, FullTableStream
 from tap_ms_dynamics_365_crm.client import AUTH_METHOD_AUTHORIZATION_CODE, AUTH_METHOD_CLIENT_CREDENTIALS
 from tap_ms_dynamics_365_crm.exceptions import (
+    MSDynamics365CrmBadRequestError,
     MSDynamics365CrmForbiddenError,
     MSDynamics365CrmUnauthorizedError,
     MSDynamics365CrmNotFoundError,
@@ -49,6 +50,45 @@ class TestBaseStreamCheckAccess(unittest.TestCase):
         )
 
         self.assertFalse(stream.check_access())
+
+    def test_check_access_logs_retrieve_multiple_permission_denial(self):
+        stream, client = self._make_stream(
+            tap_stream_id="governanceconfiguration", path="governanceconfigurations"
+        )
+        error_message = (
+            "HTTP-error-code: 400, Error Code: 0x80040265, Error: "
+            "AuthenticatedUserId test-user does not have access to invoke "
+            "RetrieveMultiple on the Entity governanceconfiguration."
+        )
+        client.make_request.side_effect = MSDynamics365CrmBadRequestError(error_message)
+
+        with patch('tap_ms_dynamics_365_crm.streams.abstracts.LOGGER.warning') as warning:
+            self.assertFalse(stream.check_access())
+
+        warning.assert_called_once_with(
+            "Unauthorized Stream: %s, excluding from catalog. "
+            "Credentials do not have access to invoke RetrieveMultiple. "
+            "HTTP-Error-Message: '%s'",
+            "governanceconfiguration",
+            error_message,
+        )
+
+    def test_check_access_does_not_mislabel_other_bad_requests_as_permission_denials(self):
+        messages = [
+            "HTTP-error-code: 400, Error Code: 0x80040265, Error: Custom validation failed.",
+            "HTTP-error-code: 400, Error Code: 0x80000000, Error: "
+            "AuthenticatedUserId test-user does not have access to invoke RetrieveMultiple.",
+        ]
+        for error_message in messages:
+            with self.subTest(error_message=error_message):
+                stream, client = self._make_stream()
+                client.make_request.side_effect = MSDynamics365CrmBadRequestError(error_message)
+
+                with patch('tap_ms_dynamics_365_crm.streams.abstracts.LOGGER.warning') as warning:
+                    with self.assertRaises(MSDynamics365CrmBadRequestError):
+                        stream.check_access()
+
+                warning.assert_not_called()
 
     def test_check_access_reraises_not_found_errors(self):
         """404s are not treated as a known-unqueryable signature and
@@ -460,6 +500,18 @@ class TestBaseStreamPagination(unittest.TestCase):
 
 class TestBaseStreamHelperMethods(unittest.TestCase):
     """Test helper methods in BaseStream"""
+
+    def test_page_size_defaults_and_overrides(self):
+        for config, maximum, expected in (
+            ({}, 5000, 5000),
+            ({"page_size": 250}, 5000, 250),
+            ({}, 500, 500),
+            ({"page_size": 1000}, 500, 500),
+        ):
+            with self.subTest(config=config, maximum=maximum):
+                client = MagicMock(max_pagesize=maximum)
+                client.config = config
+                self.assertEqual(ConcreteStream(client=client).page_size, expected)
 
     def test_update_header(self):
         """Test update_header method"""

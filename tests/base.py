@@ -7068,6 +7068,2714 @@ EXPECTED_METADATA_RAW = json.loads('''
         "replication_keys": ["modifiedon"],
         "obeys_start_date": true,
         "api_limit": 100
+    },
+    "adx_externalidentity": {
+        "primary_keys": [
+            "adx_externalidentityid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "adx_invitation": {
+        "primary_keys": [
+            "adx_invitationid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "adx_inviteredemption": {
+        "primary_keys": [
+            "activityid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "agentrule": {
+        "primary_keys": [
+            "agentruleid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "aicopilot_aiplugin": {
+        "primary_keys": [
+            "aicopilot_aipluginid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "aiplugin": {
+        "primary_keys": [
+            "aipluginid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "aipluginauth": {
+        "primary_keys": [
+            "aipluginauthid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "aipluginconversationstarter": {
+        "primary_keys": [
+            "aipluginconversationstarterid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "aipluginconversationstartermapping": {
+        "primary_keys": [
+            "aipluginconversationstartermappingid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "aipluginexternalschema": {
+        "primary_keys": [
+            "aipluginexternalschemaid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "aipluginexternalschemaproperty": {
+        "primary_keys": [
+            "aipluginexternalschemapropertyid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "aiplugingovernance": {
+        "primary_keys": [
+            "aiplugingovernanceid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "aiplugingovernanceext": {
+        "primary_keys": [
+            "aiplugingovernanceextid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "aiplugininstance": {
+        "primary_keys": [
+            "aiplugininstanceid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "aipluginoperation": {
+        "primary_keys": [
+            "aipluginoperationid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "aipluginoperationparameter": {
+        "primary_keys": [
+            "aipluginoperationparameterid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "aipluginoperationresponsetemplate": {
+        "primary_keys": [
+            "aipluginoperationresponsetemplateid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "aiplugintitle": {
+        "primary_keys": [
+            "aiplugintitleid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "aipluginusersetting": {
+        "primary_keys": [
+            "aipluginusersettingid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "allowedmcpclient": {
+        "primary_keys": [
+            "allowedmcpclientid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "anyprivilegeentity": {
+        "primary_keys": [
+            "anyprivilegeentityid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "application": {
+        "primary_keys": [
+            "applicationid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "applicationroles": {
+        "primary_keys": [
+            "applicationrolesid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "appnotificationsignal": {
+        "primary_keys": [
+            "appnotificationsignalid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "approvalprocess": {
+        "primary_keys": [
+            "approvalprocessid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "approvalstageapproval": {
+        "primary_keys": [
+            "approvalstageapprovalid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "approvalstagecondition": {
+        "primary_keys": [
+            "approvalstageconditionid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "approvalstageintelligent": {
+        "primary_keys": [
+            "approvalstageintelligentid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "approvalstageorder": {
+        "primary_keys": [
+            "approvalstageorderid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "athenareconciliationinfo": {
+        "primary_keys": [
+            "athenareconciliationinfoid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "attributeclusterconfig": {
+        "primary_keys": [
+            "attributeclusterconfigid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "attributemaskingrule": {
+        "primary_keys": [
+            "attributemaskingruleid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "backgroundoperation": {
+        "primary_keys": [
+            "backgroundoperationid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "bot_botcomponentcollection": {
+        "primary_keys": [
+            "bot_botcomponentcollectionid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "botcomponent_aipluginoperation": {
+        "primary_keys": [
+            "botcomponent_aipluginoperationid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "botcomponent_connectionreference": {
+        "primary_keys": [
+            "botcomponent_connectionreferenceid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "botcomponent_dvtablesearch": {
+        "primary_keys": [
+            "botcomponent_dvtablesearchid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "botcomponent_msdyn_aimodel": {
+        "primary_keys": [
+            "botcomponent_msdyn_aimodelid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "botcomponentcollection": {
+        "primary_keys": [
+            "botcomponentcollectionid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "businessprocess": {
+        "primary_keys": [
+            "businessprocessid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "businessprocesslinkedartifact": {
+        "primary_keys": [
+            "businessprocesslinkedartifactid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "cardentityconnections": {
+        "primary_keys": [
+            "cardentityconnectionsid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "cardstateitem": {
+        "primary_keys": [
+            "cardstateitemid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "certificatecredential": {
+        "primary_keys": [
+            "certificatecredentialid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "componentversiondatasource": {
+        "primary_keys": [
+            "componentversiondatasourceid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "computeruseagent": {
+        "primary_keys": [
+            "computeruseagentid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "controlconfiguration": {
+        "primary_keys": [
+            "controlconfigurationid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "copilotexamplequestion": {
+        "primary_keys": [
+            "copilotexamplequestionid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "copilotglossaryterm": {
+        "primary_keys": [
+            "copilotglossarytermid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "copilotsynonyms": {
+        "primary_keys": [
+            "copilotsynonymsid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "credential": {
+        "primary_keys": [
+            "credentialid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "deleteditemreference": {
+        "primary_keys": [
+            "deleteditemreferenceid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "dependency": {
+        "primary_keys": [
+            "dependencyid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "desktopflowmodule": {
+        "primary_keys": [
+            "desktopflowmoduleid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "dvfilesearch": {
+        "primary_keys": [
+            "dvfilesearchid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "dvfilesearchattribute": {
+        "primary_keys": [
+            "dvfilesearchattributeid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "dvfilesearchentity": {
+        "primary_keys": [
+            "dvfilesearchentityid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "dvtablesearch": {
+        "primary_keys": [
+            "dvtablesearchid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "dvtablesearchattribute": {
+        "primary_keys": [
+            "dvtablesearchattributeid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "dvtablesearchentity": {
+        "primary_keys": [
+            "dvtablesearchentityid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "elasticfileattachment": {
+        "primary_keys": [
+            "elasticfileattachmentid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "emailaddressconfiguration": {
+        "primary_keys": [
+            "emailaddressconfigurationid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "entityclusterconfig": {
+        "primary_keys": [
+            "entityclusterconfigid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "entityrecordfilter": {
+        "primary_keys": [
+            "entityrecordfilterid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "eventexpanderbreadcrumb": {
+        "primary_keys": [
+            "eventexpanderbreadcrumbid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "exportedexcel": {
+        "primary_keys": [
+            "exportedexcelid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "fabricaiskill": {
+        "primary_keys": [
+            "fabricaiskillid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "federatedknowledgeconfiguration": {
+        "primary_keys": [
+            "federatedknowledgeconfigurationid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "federatedknowledgeentityconfiguration": {
+        "primary_keys": [
+            "federatedknowledgeentityconfigurationid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "flowaggregation": {
+        "primary_keys": [
+            "flowaggregationid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "flowcapacityassignment": {
+        "primary_keys": [
+            "flowcapacityassignmentid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "flowcredentialapplication": {
+        "primary_keys": [
+            "flowcredentialapplicationid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "flowevent": {
+        "primary_keys": [
+            "floweventid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "flowgroup": {
+        "primary_keys": [
+            "flowgroupid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "flowrun": {
+        "primary_keys": [
+            "flowrunid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "flowsessionbinary": {
+        "primary_keys": [
+            "flowsessionbinaryid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "flowtestsession": {
+        "primary_keys": [
+            "flowtestsessionid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "flowtrigger": {
+        "primary_keys": [
+            "flowtriggerid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "flowtriggerinstance": {
+        "primary_keys": [
+            "flowtriggerinstanceid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "fxexpression": {
+        "primary_keys": [
+            "fxexpressionid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "gitconfigurationretrievaldatasource": {
+        "primary_keys": [
+            "gitconfigurationretrievaldatasourceid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "githubappconfig": {
+        "primary_keys": [
+            "githubappconfigid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "indexedtrait": {
+        "primary_keys": [
+            "indexedtraitid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "invaliddependency": {
+        "primary_keys": [
+            "invaliddependencyid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "knowledgefaq": {
+        "primary_keys": [
+            "knowledgefaqid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "mainfewshot": {
+        "primary_keys": [
+            "mainfewshotid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "makerfewshot": {
+        "primary_keys": [
+            "makerfewshotid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "maskingrule": {
+        "primary_keys": [
+            "maskingruleid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "mcpprompt": {
+        "primary_keys": [
+            "mcppromptid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "mcpresource": {
+        "primary_keys": [
+            "mcpresourceid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "mcpresourcecontent": {
+        "primary_keys": [
+            "mcpresourcecontentid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "mcpserver": {
+        "primary_keys": [
+            "mcpserverid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "mcptool": {
+        "primary_keys": [
+            "mcptoolid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "metadataforarchival": {
+        "primary_keys": [
+            "metadataforarchivalid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "mobileofflineprofileextension": {
+        "primary_keys": [
+            "mobileofflineprofileextensionid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "mos3management": {
+        "primary_keys": [
+            "mos3managementid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_aiconfiguration_documenttemplate": {
+        "primary_keys": [
+            "msdyn_aiconfiguration_documenttemplateid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "msdyn_aidataprocessingevent": {
+        "primary_keys": [
+            "msdyn_aidataprocessingeventid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_aidocumenttemplate": {
+        "primary_keys": [
+            "msdyn_aidocumenttemplateid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_aievaluationconfiguration": {
+        "primary_keys": [
+            "msdyn_aievaluationconfigurationid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_aievaluationrun": {
+        "primary_keys": [
+            "msdyn_aievaluationrunid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_aievent": {
+        "primary_keys": [
+            "msdyn_aieventid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_aitestcase": {
+        "primary_keys": [
+            "msdyn_aitestcaseid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_aitestcasedocument": {
+        "primary_keys": [
+            "msdyn_aitestcasedocumentid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_aitestcaseinput": {
+        "primary_keys": [
+            "msdyn_aitestcaseinputid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_aitestrun": {
+        "primary_keys": [
+            "msdyn_aitestrunid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_aitestrunbatch": {
+        "primary_keys": [
+            "msdyn_aitestrunbatchid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_analysisoverride": {
+        "primary_keys": [
+            "msdyn_analysisoverrideid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_bulkharvestrunlog": {
+        "primary_keys": [
+            "msdyn_bulkharvestrunlogid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_copilotinteractions": {
+        "primary_keys": [
+            "msdyn_copilotinteractionsid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_dataflow_datalakefolder": {
+        "primary_keys": [
+            "msdyn_dataflow_datalakefolderid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_dataflowconnectionreference": {
+        "primary_keys": [
+            "msdyn_dataflowconnectionreferenceid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_dataflowtemplate": {
+        "primary_keys": [
+            "msdyn_dataflowtemplateid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_dmsrequest": {
+        "primary_keys": [
+            "msdyn_dmsrequestid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_dmsrequeststatus": {
+        "primary_keys": [
+            "msdyn_dmsrequeststatusid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_dmssyncrequest": {
+        "primary_keys": [
+            "msdyn_dmssyncrequestid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_dmssyncstatus": {
+        "primary_keys": [
+            "msdyn_dmssyncstatusid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_evalassertion": {
+        "primary_keys": [
+            "msdyn_evalassertionid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_evaldataset": {
+        "primary_keys": [
+            "msdyn_evaldatasetid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_evalprompt": {
+        "primary_keys": [
+            "msdyn_evalpromptid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_evalresult": {
+        "primary_keys": [
+            "msdyn_evalresultid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_evalrun": {
+        "primary_keys": [
+            "msdyn_evalrunid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_favoriteknowledgearticle": {
+        "primary_keys": [
+            "msdyn_favoriteknowledgearticleid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_fileupload": {
+        "primary_keys": [
+            "msdyn_fileuploadid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_flow_actionapprovalmodel": {
+        "primary_keys": [
+            "msdyn_flow_actionapprovalmodelid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_flow_approval": {
+        "primary_keys": [
+            "msdyn_flow_approvalid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_flow_approvalrequest": {
+        "primary_keys": [
+            "msdyn_flow_approvalrequestid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_flow_approvalresponse": {
+        "primary_keys": [
+            "msdyn_flow_approvalresponseid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_flow_approvalstep": {
+        "primary_keys": [
+            "msdyn_flow_approvalstepid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_flow_awaitallactionapprovalmodel": {
+        "primary_keys": [
+            "msdyn_flow_awaitallactionapprovalmodelid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_flow_awaitallapprovalmodel": {
+        "primary_keys": [
+            "msdyn_flow_awaitallapprovalmodelid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_flow_basicapprovalmodel": {
+        "primary_keys": [
+            "msdyn_flow_basicapprovalmodelid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_flow_flowapproval": {
+        "primary_keys": [
+            "msdyn_flow_flowapprovalid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_formmapping": {
+        "primary_keys": [
+            "msdyn_formmappingid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_function": {
+        "primary_keys": [
+            "msdyn_functionid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_harvesteligibilitycondition": {
+        "primary_keys": [
+            "msdyn_harvesteligibilityconditionid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_harvestworkitem": {
+        "primary_keys": [
+            "msdyn_harvestworkitemid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_historicalcaseharvestbatch": {
+        "primary_keys": [
+            "msdyn_historicalcaseharvestbatchid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_historicalcaseharvestrun": {
+        "primary_keys": [
+            "msdyn_historicalcaseharvestrunid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_historicalcaseharvestrunlog": {
+        "primary_keys": [
+            "msdyn_historicalcaseharvestrunlogid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_knowledgeharvestjobrecord": {
+        "primary_keys": [
+            "msdyn_knowledgeharvestjobrecordid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_knowledgeharvestplan": {
+        "primary_keys": [
+            "msdyn_knowledgeharvestplanid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_mobileapp": {
+        "primary_keys": [
+            "msdyn_mobileappid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_modulerundetail": {
+        "primary_keys": [
+            "msdyn_modulerundetailid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_nativeextension": {
+        "primary_keys": [
+            "msdyn_nativeextensionid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_pmbusinessruleautomationconfig": {
+        "primary_keys": [
+            "msdyn_pmbusinessruleautomationconfigid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_pmprocesstemplate": {
+        "primary_keys": [
+            "msdyn_pmprocesstemplateid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_pmsimulation": {
+        "primary_keys": [
+            "msdyn_pmsimulationid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_pmtab": {
+        "primary_keys": [
+            "msdyn_pmtabid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_powerappswrapbuild": {
+        "primary_keys": [
+            "msdyn_powerappswrapbuildid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_qna": {
+        "primary_keys": [
+            "msdyn_qnaid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_rtestructuredtemplate": {
+        "primary_keys": [
+            "msdyn_rtestructuredtemplateid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_rtestructuredtemplateconfig": {
+        "primary_keys": [
+            "msdyn_rtestructuredtemplateconfigid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_rtetemplatemapping": {
+        "primary_keys": [
+            "msdyn_rtetemplatemappingid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_salesforcestructuredobject": {
+        "primary_keys": [
+            "msdyn_salesforcestructuredobjectid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_salesforcestructuredqnaconfig": {
+        "primary_keys": [
+            "msdyn_salesforcestructuredqnaconfigid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_schedule": {
+        "primary_keys": [
+            "msdyn_scheduleid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_solutionhistorydatasource": {
+        "primary_keys": [
+            "msdyn_solutionhistorydatasourceid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "msdyn_timelinepin": {
+        "primary_keys": [
+            "msdyn_timelinepinid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "mspcat_catalogsubmissionfiles": {
+        "primary_keys": [
+            "mspcat_catalogsubmissionfilesid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "mspcat_packagestore": {
+        "primary_keys": [
+            "mspcat_packagestoreid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "mspp_adplacement": {
+        "primary_keys": [
+            "mspp_adplacementid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_columnpermission": {
+        "primary_keys": [
+            "mspp_columnpermissionid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_columnpermissionprofile": {
+        "primary_keys": [
+            "mspp_columnpermissionprofileid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_contentsnippet": {
+        "primary_keys": [
+            "mspp_contentsnippetid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_entityform": {
+        "primary_keys": [
+            "mspp_entityformid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_entityformmetadata": {
+        "primary_keys": [
+            "mspp_entityformmetadataid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_entitylist": {
+        "primary_keys": [
+            "mspp_entitylistid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_entitypermission": {
+        "primary_keys": [
+            "mspp_entitypermissionid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_pagetemplate": {
+        "primary_keys": [
+            "mspp_pagetemplateid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_pollplacement": {
+        "primary_keys": [
+            "mspp_pollplacementid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_powerpagescoreentityds": {
+        "primary_keys": [
+            "mspp_powerpagescoreentitydsid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_publishingstate": {
+        "primary_keys": [
+            "mspp_publishingstateid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_publishingstatetransitionrule": {
+        "primary_keys": [
+            "mspp_publishingstatetransitionruleid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_redirect": {
+        "primary_keys": [
+            "mspp_redirectid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_shortcut": {
+        "primary_keys": [
+            "mspp_shortcutid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_sitemarker": {
+        "primary_keys": [
+            "mspp_sitemarkerid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_sitesetting": {
+        "primary_keys": [
+            "mspp_sitesettingid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_webfile": {
+        "primary_keys": [
+            "mspp_webfileid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_webform": {
+        "primary_keys": [
+            "mspp_webformid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_webformmetadata": {
+        "primary_keys": [
+            "mspp_webformmetadataid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_webformstep": {
+        "primary_keys": [
+            "mspp_webformstepid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_weblink": {
+        "primary_keys": [
+            "mspp_weblinkid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_weblinkset": {
+        "primary_keys": [
+            "mspp_weblinksetid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_webpage": {
+        "primary_keys": [
+            "mspp_webpageid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_webpageaccesscontrolrule": {
+        "primary_keys": [
+            "mspp_webpageaccesscontrolruleid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_webrole": {
+        "primary_keys": [
+            "mspp_webroleid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_website": {
+        "primary_keys": [
+            "mspp_websiteid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_websiteaccess": {
+        "primary_keys": [
+            "mspp_websiteaccessid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_websitelanguage": {
+        "primary_keys": [
+            "mspp_websitelanguageid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "mspp_webtemplate": {
+        "primary_keys": [
+            "mspp_webtemplateid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "nlsqregistration": {
+        "primary_keys": [
+            "nlsqregistrationid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "organizationdatasyncfnostate": {
+        "primary_keys": [
+            "organizationdatasyncfnostateid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "organizationdatasyncsubscriptionfnotable": {
+        "primary_keys": [
+            "organizationdatasyncsubscriptionfnotableid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "packagehistory": {
+        "primary_keys": [
+            "packagehistoryid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "plannerbusinessscenario": {
+        "primary_keys": [
+            "plannerbusinessscenarioid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "plannersyncaction": {
+        "primary_keys": [
+            "plannersyncactionid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "plugin": {
+        "primary_keys": [
+            "pluginid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "powerpagecomponent": {
+        "primary_keys": [
+            "powerpagecomponentid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "powerpagecomponent_powerpagecomponent": {
+        "primary_keys": [
+            "powerpagecomponent_powerpagecomponentid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "powerpagesddosalert": {
+        "primary_keys": [
+            "powerpagesddosalertid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "powerpagesite": {
+        "primary_keys": [
+            "powerpagesiteid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "powerpagesite_dvfilesearch": {
+        "primary_keys": [
+            "powerpagesite_dvfilesearchid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "powerpagesite_dvtablesearch": {
+        "primary_keys": [
+            "powerpagesite_dvtablesearchid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "powerpagesitelanguage": {
+        "primary_keys": [
+            "powerpagesitelanguageid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "powerpagesitepublished": {
+        "primary_keys": [
+            "powerpagesitepublishedid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "powerpageslog": {
+        "primary_keys": [
+            "powerpageslogid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "powerpagesmanagedidentity": {
+        "primary_keys": [
+            "powerpagesmanagedidentityid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "powerpagesscanreport": {
+        "primary_keys": [
+            "powerpagesscanreportid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "powerpagessiteaifeedback": {
+        "primary_keys": [
+            "powerpagessiteaifeedbackid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "powerpagessourcefile": {
+        "primary_keys": [
+            "powerpagessourcefileid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "powerpagesusermapping": {
+        "primary_keys": [
+            "powerpagesusermappingid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "privilegecheckerlog": {
+        "primary_keys": [
+            "privilegecheckerlogid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "privilegecheckerrun": {
+        "primary_keys": [
+            "privilegecheckerrunid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "recentlyused": {
+        "primary_keys": [
+            "recentlyusedid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "recordfilter": {
+        "primary_keys": [
+            "recordfilterid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "recyclebinconfig": {
+        "primary_keys": [
+            "recyclebinconfigid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "reportparameter": {
+        "primary_keys": [
+            "reportparameterid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "retaineddataexcel": {
+        "primary_keys": [
+            "retaineddataexcelid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "retentionconfig": {
+        "primary_keys": [
+            "retentionconfigid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "sa_suggestedaction": {
+        "primary_keys": [
+            "sa_suggestedactionid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "sa_suggestedactioncriteria": {
+        "primary_keys": [
+            "sa_suggestedactioncriteriaid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "savingrule": {
+        "primary_keys": [
+            "savingruleid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "searchattributesettings": {
+        "primary_keys": [
+            "searchattributesettingsid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "searchcustomanalyzer": {
+        "primary_keys": [
+            "searchcustomanalyzerid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "searchresultscache": {
+        "primary_keys": [
+            "searchresultscacheid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "sensitivitylabelattributemapping": {
+        "primary_keys": [
+            "sensitivitylabelattributemappingid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "sharedworkspacepool": {
+        "primary_keys": [
+            "sharedworkspacepoolid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "sideloadedaiplugin": {
+        "primary_keys": [
+            "sideloadedaipluginid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "signal": {
+        "primary_keys": [
+            "signalid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "skill": {
+        "primary_keys": [
+            "skillid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "skilldvtablesearch": {
+        "primary_keys": [
+            "skilldvtablesearchid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "skillmetadata": {
+        "primary_keys": [
+            "skillmetadataid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "skillresource": {
+        "primary_keys": [
+            "skillresourceid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "skillrolemapping": {
+        "primary_keys": [
+            "skillrolemappingid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "sourcecontrolbranchconfiguration": {
+        "primary_keys": [
+            "sourcecontrolbranchconfigurationid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "sourcecontrolcomponent": {
+        "primary_keys": [
+            "sourcecontrolcomponentid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "sourcecontrolconfiguration": {
+        "primary_keys": [
+            "sourcecontrolconfigurationid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "sourcecontroloperationtracking": {
+        "primary_keys": [
+            "sourcecontroloperationtrackingid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "stagedentity": {
+        "primary_keys": [
+            "stagedentityid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "stagedentityattribute": {
+        "primary_keys": [
+            "stagedentityattributeid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "stagedmetadataasyncoperation": {
+        "primary_keys": [
+            "stagedmetadataasyncoperationid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "stagedsourcecontrolcomponent": {
+        "primary_keys": [
+            "stagedsourcecontrolcomponentid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "tag": {
+        "primary_keys": [
+            "tagid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "taggedflowsession": {
+        "primary_keys": [
+            "taggedflowsessionid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "taggedprocess": {
+        "primary_keys": [
+            "taggedprocessid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "textanalyticsentitymapping": {
+        "primary_keys": [
+            "textanalyticsentitymappingid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "textdatarecordsindexingstatus": {
+        "primary_keys": [
+            "textdatarecordsindexingstatusid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "timezonedefinition": {
+        "primary_keys": [
+            "timezonedefinitionid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "timezonerule": {
+        "primary_keys": [
+            "timezoneruleid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "trait": {
+        "primary_keys": [
+            "traitid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "viewasexamplequestion": {
+        "primary_keys": [
+            "viewasexamplequestionid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "workflowcardconnections": {
+        "primary_keys": [
+            "workflowcardconnectionsid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "workqueue": {
+        "primary_keys": [
+            "workqueueid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "workqueueitem": {
+        "primary_keys": [
+            "workqueueitemid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_geolocationsettings": {
+        "primary_keys": [
+            "msdyn_geolocationsettingsid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
     }
 }
 ''')
