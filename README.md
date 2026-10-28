@@ -43,6 +43,23 @@ Notes:
 - `refresh_token` is only required for `authorization_code`.
 - For `client_credentials`, tokens are cached in memory and renewed on expiry.
 
+### Streams that depend on the authentication mode
+
+Some Dataverse entities can only be read with one auth mode. The tap skips them automatically in the unsupported mode (an info/warning is logged) so discovery and sync do not fail.
+
+**Streams discovered per auth mode** (counts from verified discovery runs; custom streams are unmanaged custom entities in your org, which are discovered automatically):
+
+| Auth mode | Standard CRM streams | Custom streams
+|---|---|---|---|
+| `client_credentials` | 1180 | your org's custom entities
+| `authorization_code` | 679 | your org's custom entities
+
+- 466 of the `client_credentials` streams are not accessible in `authorization_code` mode and are skipped there. Use `auth_method: client_credentials` to extract them.
+- **Client-credentials-only streams** (for example `aiplugin`, `application`, `approvalprocess`, `flowsession`, many `msdyn_*` entities) return `400 Expected non-empty Guid` when called as a delegated user, because the entity set cannot be listed without a record id. Use `auth_method: client_credentials` to extract them.
+- **Role-dependent streams** return `403` (missing Read privilege) for the signed-in user; grant a role with Read access or use `client_credentials`.
+
+The full stream lists are in [docs/auth_mode_stream_support.md](docs/auth_mode_stream_support.md).
+
 ## Quick Start
 
 1. Install

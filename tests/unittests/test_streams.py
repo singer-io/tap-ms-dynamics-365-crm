@@ -34,7 +34,7 @@ class TestGetStreamsAccessFiltering(unittest.TestCase):
     def test_guid_error_streams_require_client_credentials(
         self, mock_flatten, mock_build_entity_metadata, mock_check_access
     ):
-        self.assertEqual(len(CLIENT_CREDENTIALS_ONLY_STREAMS), 464)
+        self.assertEqual(len(CLIENT_CREDENTIALS_ONLY_STREAMS), 466)
         self.assertEqual(
             INCLUDED_ENTITIES["client_credentials_entities"],
             CLIENT_CREDENTIALS_ONLY_STREAMS,
@@ -54,7 +54,7 @@ class TestGetStreamsAccessFiltering(unittest.TestCase):
                         CLIENT_CREDENTIALS_ONLY_STREAMS
                         if auth_method == AUTH_METHOD_CLIENT_CREDENTIALS else set(),
                     )
-        self.assertEqual(mock_check_access.call_count, 464)
+        self.assertEqual(mock_check_access.call_count, 466)
 
     @patch.object(BaseStream, 'check_access', autospec=True)
     @patch('tap_ms_dynamics_365_crm.streams.streams.build_entity_metadata')

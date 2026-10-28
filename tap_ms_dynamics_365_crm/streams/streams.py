@@ -51,7 +51,6 @@ REPLICATION_TO_STREAM_MAP = {
 
 AUTHORIZATION_CODE_ONLY_STREAMS = {
     'aaduser',
-    'gitorganization',
     'sensitivitylabel',
     'sharedworkspaceaccesstoken2'
 }
