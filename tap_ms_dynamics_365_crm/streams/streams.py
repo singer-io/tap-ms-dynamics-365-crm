@@ -55,6 +55,23 @@ AUTHORIZATION_CODE_ONLY_STREAMS = {
     'sharedworkspaceaccesstoken2'
 }
 
+def _request_metadata(client: Client, path: str, **kwargs):
+    try:
+        return client.make_request(method='GET', path=path, **kwargs)
+    except MSDynamics365CrmForbiddenError as exc:
+        message = (
+            f"HTTP-error-code: 403, Error: Cannot read Dataverse metadata from "
+            f"'{path}'. Discovery cannot continue without metadata access. "
+            "Ask your Dataverse administrator to grant the authenticated user "
+            "or application user a security role with the required metadata "
+            "Read privileges. If the original error names 'prvReadEntity', "
+            "grant the Entity Read privilege. "
+            f"Original error: {exc}"
+        )
+        LOGGER.error(message)
+        raise MSDynamics365CrmForbiddenError(message) from exc
+
+
 def call_entity_definitions(client: Client):
     """Calls the `EntityDefinitions` endpoint to get all entities."""
     params = {
@@ -65,8 +82,8 @@ def call_entity_definitions(client: Client):
         "$count": "true",
     }
 
-    results = client.make_request(
-        method='GET',
+    results = _request_metadata(
+        client,
         params=params,
         path='EntityDefinitions'
     )
@@ -78,7 +95,7 @@ def call_entity_definitions(client: Client):
 def build_entity_metadata(client: Client, included_entities: dict):
     """Builds entity metadata from the `$metadata` endpoints."""
     entity_definitions = call_entity_definitions(client)
-    metadata = client.make_request(method='GET', path='$metadata')
+    metadata = _request_metadata(client, path='$metadata')
     entity_metadata = transform_metadata_xml(metadata)
 
     for entity in entity_definitions:

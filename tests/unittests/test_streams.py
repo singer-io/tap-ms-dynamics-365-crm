@@ -16,6 +16,47 @@ from tap_ms_dynamics_365_crm.exceptions import MSDynamics365CrmForbiddenError
 from tap_ms_dynamics_365_crm.streams import CLIENT_CREDENTIALS_ONLY_STREAMS, INCLUDED_ENTITIES
 
 
+class TestMetadataAccessErrors(unittest.TestCase):
+    def test_metadata_forbidden_logs_actionable_error_and_preserves_cause(self):
+        for endpoint in ('EntityDefinitions', '$metadata'):
+            with self.subTest(endpoint=endpoint):
+                client = MagicMock()
+                original = MSDynamics365CrmForbiddenError(
+                    "HTTP-error-code: 403, Error Code: 0x80040220, "
+                    "Error: SecLib::CheckPrivilege failed. PrivilegeName: prvReadEntity."
+                )
+                client.make_request.side_effect = original
+
+                with patch('tap_ms_dynamics_365_crm.streams.streams.LOGGER.error') as log:
+                    with self.assertRaises(MSDynamics365CrmForbiddenError) as raised:
+                        if endpoint == 'EntityDefinitions':
+                            list(call_entity_definitions(client))
+                        else:
+                            list(build_entity_metadata(client, {}))
+
+                message = str(raised.exception)
+                self.assertIn(f"'{endpoint}'", message)
+                self.assertIn("Discovery cannot continue", message)
+                self.assertIn("Dataverse administrator", message)
+                self.assertIn("Entity Read privilege", message)
+                self.assertIn(str(original), message)
+                self.assertIs(raised.exception.__cause__, original)
+                log.assert_called_once_with(message)
+                client.make_request.assert_called_once()
+
+    def test_unrelated_metadata_errors_propagate_unchanged(self):
+        client = MagicMock()
+        original = ValueError("Invalid metadata response")
+        client.make_request.side_effect = original
+
+        with patch('tap_ms_dynamics_365_crm.streams.streams.LOGGER.error') as log:
+            with self.assertRaises(ValueError) as raised:
+                list(build_entity_metadata(client, {}))
+
+        self.assertIs(raised.exception, original)
+        log.assert_not_called()
+
+
 class TestGetStreamsAccessFiltering(unittest.TestCase):
     """Test that get_streams excludes inaccessible entities from the catalog
     when create_schema=True (discovery), and skips the check during sync."""
