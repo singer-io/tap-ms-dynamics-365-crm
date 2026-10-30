@@ -1,6 +1,10 @@
 import singer
 
-from tap_ms_dynamics_365_crm.client import Client
+from tap_ms_dynamics_365_crm.client import (
+    AUTH_METHOD_AUTHORIZATION_CODE,
+    AUTH_METHOD_CLIENT_CREDENTIALS,
+    Client,
+)
 from tap_ms_dynamics_365_crm.xml_transformer import (
     flatten_entity_attributes,
     transform_metadata_xml
@@ -45,15 +49,41 @@ REPLICATION_TO_STREAM_MAP = {
     'FULL_TABLE': FullTableStream
 }
 
+AUTHORIZATION_CODE_ONLY_STREAMS = {
+    'aaduser',
+    'sensitivitylabel',
+    'sharedworkspaceaccesstoken2'
+}
+
+def _request_metadata(client: Client, path: str, **kwargs):
+    try:
+        return client.make_request(method='GET', path=path, **kwargs)
+    except MSDynamics365CrmForbiddenError as exc:
+        message = (
+            f"HTTP-error-code: 403, Error: Cannot read Dataverse metadata from "
+            f"'{path}'. Discovery cannot continue without metadata access. "
+            "Ask your Dataverse administrator to grant the authenticated user "
+            "or application user a security role with the required metadata "
+            "Read privileges. If the original error names 'prvReadEntity', "
+            "grant the Entity Read privilege. "
+            f"Original error: {exc}"
+        )
+        LOGGER.error(message)
+        raise MSDynamics365CrmForbiddenError(message) from exc
+
+
 def call_entity_definitions(client: Client):
     """Calls the `EntityDefinitions` endpoint to get all entities."""
     params = {
-        "$select": "MetadataId,LogicalName,EntitySetName,IsCustomEntity,IsManaged",
+        "$select": (
+            "MetadataId,LogicalName,EntitySetName,IsCustomEntity,IsManaged,"
+            "PrimaryIdAttribute"
+        ),
         "$count": "true",
     }
 
-    results = client.make_request(
-        method='GET',
+    results = _request_metadata(
+        client,
         params=params,
         path='EntityDefinitions'
     )
@@ -65,7 +95,7 @@ def call_entity_definitions(client: Client):
 def build_entity_metadata(client: Client, included_entities: dict):
     """Builds entity metadata from the `$metadata` endpoints."""
     entity_definitions = call_entity_definitions(client)
-    metadata = client.make_request(method='GET', path='$metadata')
+    metadata = _request_metadata(client, path='$metadata')
     entity_metadata = transform_metadata_xml(metadata)
 
     for entity in entity_definitions:
@@ -76,6 +106,11 @@ def build_entity_metadata(client: Client, included_entities: dict):
         if ((is_custom and not is_managed) or is_included) and entity_name in entity_metadata:
             entity_metadata[entity_name]["LogicalName"] = entity_name
             entity_metadata[entity_name]["EntitySetName"] = entity.get("EntitySetName")
+            # EntityDefinitions' PrimaryIdAttribute is the authoritative primary
+            # key; fall back to the $metadata XML's <Key> only if it's absent.
+            entity_metadata[entity_name]["Key"] = (
+                entity.get("PrimaryIdAttribute") or entity_metadata[entity_name].get("Key")
+            )
             yield entity_metadata[entity_name]
 
 def get_streams(client: Client, create_schema: bool = True) -> dict:
@@ -86,7 +121,9 @@ def get_streams(client: Client, create_schema: bool = True) -> dict:
         client: MS Dynamics client instance
         create_schema: Flag to control schema creation (default: True)
     """
-    from tap_ms_dynamics_365_crm.streams import INCLUDED_ENTITIES, EXCLUDED_ENTITIES
+    from tap_ms_dynamics_365_crm.streams import (
+        INCLUDED_ENTITIES, EXCLUDED_ENTITIES, CLIENT_CREDENTIALS_ONLY_STREAMS,
+    )
     included_entities = INCLUDED_ENTITIES
     excluded_entities = EXCLUDED_ENTITIES
 
@@ -100,6 +137,26 @@ def get_streams(client: Client, create_schema: bool = True) -> dict:
         stream_endpoint = stream.get('EntitySetName') or ''
         stream_key = stream.get('Key')
         LOGGER.info('Processing stream: {}'.format(stream_name))
+
+        if (
+            stream_name in CLIENT_CREDENTIALS_ONLY_STREAMS
+            and client.auth_method != AUTH_METHOD_CLIENT_CREDENTIALS
+        ):
+            LOGGER.info(
+                "Skipping stream '%s': it requires client_credentials auth_method.",
+                stream_name,
+            )
+            continue
+
+        if (
+            stream_name in AUTHORIZATION_CODE_ONLY_STREAMS
+            and client.auth_method != AUTH_METHOD_AUTHORIZATION_CODE
+        ):
+            LOGGER.info(
+                "Skipping stream '%s': it requires authorization_code auth_method.",
+                stream_name,
+            )
+            continue
 
         # skip over any streams that don't have a name or are in EXCLUDED_ENTITIES
         if not stream_name or stream_name in excluded_entities:

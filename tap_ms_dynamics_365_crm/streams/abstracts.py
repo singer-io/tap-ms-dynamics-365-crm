@@ -10,28 +10,13 @@ from singer import (
     write_schema,
     metadata
 )
-from tap_ms_dynamics_365_crm.client import Client, MAX_PAGESIZE, AUTH_METHOD_AUTHORIZATION_CODE
+from tap_ms_dynamics_365_crm.client import Client, MAX_PAGESIZE
 from tap_ms_dynamics_365_crm.exceptions import (
-    MSDynamics365CrmError,
     MSDynamics365CrmForbiddenError,
-    MSDynamics365CrmNotFoundError
+    MSDynamics365CrmBadRequestError
 )
 
 LOGGER = get_logger()
-
-# Entities that reject a plain collection GET with `Expected non-empty Guid`
-# (400) under the `authorization_code` (delegated) auth method -- but ARE
-# valid, accessible entity sets there, they just can't be listed without an
-# id. For these, under authorization_code, access is confirmed (and records
-# are extracted during sync) by fetching the calling user's Dataverse UserId
-# (via WhoAmI) and requesting that id directly: a 404 "... Does Not Exist"
-# confirms the entity set itself is reachable (the id simply doesn't match a
-# record there). Under client_credentials the plain collection GET works
-# fine, so this scoping is skipped entirely for that auth method.
-SCOPED_ACCESS_CHECK_ENTITIES = {
-    'msdyn_requirementdependency',
-    'msdyn_incidenttypessetup',
-}
 
 
 class BaseStream(ABC):
@@ -47,7 +32,7 @@ class BaseStream(ABC):
 
     url_endpoint = ""
     path = ""
-    page_size = 100
+    page_size = MAX_PAGESIZE
     parent = ""
     data_key = "value"
     parent_bookmark_key = ""
@@ -111,10 +96,6 @@ class BaseStream(ABC):
 
     def get_records(self) -> Iterator:
         """Interacts with api client interaction and pagination."""
-        if self._uses_scoped_access():
-            yield from self._get_scoped_records()
-            return
-
         next_page = True
         endpoint = self.url_endpoint
 
@@ -128,57 +109,6 @@ class BaseStream(ABC):
                 next_page = False
 
             yield from response.get(self.data_key, [])
-
-    def _uses_scoped_access(self) -> bool:
-        """Whether this stream must use the WhoAmI-scoped id lookup instead
-        of a plain collection request -- only applies to entities in
-        SCOPED_ACCESS_CHECK_ENTITIES under the authorization_code auth
-        method (client_credentials can query these entities normally)."""
-        return (
-            self.tap_stream_id in SCOPED_ACCESS_CHECK_ENTITIES
-            and self.client.auth_method == AUTH_METHOD_AUTHORIZATION_CODE
-        )
-
-    def _get_current_user_id(self):
-        """Fetches the calling user's Dataverse UserId via WhoAmI. Returns
-        None (and logs a warning) if it can't be resolved."""
-        try:
-            who_am_i = self.client.make_request(
-                method='GET', endpoint=f"{self.client.base_url}/WhoAmI"
-            )
-        except MSDynamics365CrmError as exc:
-            LOGGER.warning(
-                "Could not resolve current user via WhoAmI for stream: %s. "
-                "HTTP-Error-Message: '%s'",
-                self.tap_stream_id, str(exc),
-            )
-            return None
-
-        user_id = who_am_i.get('UserId')
-        if not user_id:
-            LOGGER.warning(
-                "WhoAmI response missing UserId for stream: %s.", self.tap_stream_id,
-            )
-        return user_id
-
-    def _get_scoped_records(self) -> Iterator:
-        """Fetches the single record scoped to the calling user's id for
-        entities in SCOPED_ACCESS_CHECK_ENTITIES, used in place of the normal
-        (unsupported) collection GET. Yields nothing if the id doesn't match
-        a record (404 'Does Not Exist')."""
-        user_id = self._get_current_user_id()
-        if not user_id:
-            return
-
-        endpoint = self.get_url_endpoint()
-        try:
-            record = self.client.make_request(
-                method='GET', endpoint=f"{endpoint}({user_id})", headers=self.headers
-            )
-            yield record
-        except MSDynamics365CrmNotFoundError as exc:
-            if "does not exist" not in str(exc).lower():
-                raise
 
     def write_schema(self) -> None:
         """
@@ -240,16 +170,9 @@ class BaseStream(ABC):
         stream's entity set. Returns False when the entity set isn't plainly
         queryable via a simple GET:
          - 403 Forbidden: credentials lack access to the entity.
-
-        Entities in SCOPED_ACCESS_CHECK_ENTITIES (under authorization_code)
-        skip the plain GET entirely and are verified via _check_scoped_access
-        instead, which uses a 404 Not Found "... Does Not Exist" response
-        as its confirmation signal.
+         - 400 Bad Request with a RetrieveMultiple permission denial.
         """
         endpoint = self.get_url_endpoint()
-
-        if self._uses_scoped_access():
-            return self._check_scoped_access(endpoint)
 
         try:
             self.client.make_request(method='GET', endpoint=endpoint, params={'$top': 1})
@@ -260,40 +183,42 @@ class BaseStream(ABC):
                 self.tap_stream_id, str(exc),
             )
             return False
+        except MSDynamics365CrmBadRequestError as exc:
+            error_message = str(exc)
+            error_message_lower = error_message.lower()
+            if (
+                '0x80040265' in error_message_lower
+                and (
+                    'does not have access to invoke retrievemultiple' in error_message_lower
+                    # Bare platform message; ISV validation text wraps or extends it.
+                    or error_message_lower.rstrip(' .\n').endswith(
+                        'error: caller is not allowed to perform this operation')
+                )
+            ):
+                LOGGER.warning(
+                    "Unauthorized Stream: %s, excluding from catalog. "
+                    "Credentials do not have access to invoke RetrieveMultiple. "
+                    "HTTP-Error-Message: '%s'",
+                    self.tap_stream_id,
+                    error_message,
+                )
+                return False
 
-    def _check_scoped_access(self, endpoint: str) -> bool:
-        """
-        Confirms access for entities that reject a plain collection GET
-        (`Expected non-empty Guid`) but are otherwise valid, queryable entity
-        sets. Fetches the calling user's Dataverse UserId via WhoAmI, then
-        requests that id directly:
-         - 200: entity set and record are both reachable -> access confirmed.
-         - 404 "... Does Not Exist": entity set is reachable, the id just
-           doesn't match a record there -> access confirmed.
-         - Any other error (403, an unrelated 404, etc.): access is not
-           confirmed -> exclude the stream.
-        """
-        user_id = self._get_current_user_id()
-        if not user_id:
-            return False
+            if (
+                '0x80040224' in error_message_lower
+                and 'retrievemultiple isn\'t supported in non-admin scenarios'
+                in error_message_lower
+            ):
+                LOGGER.warning(
+                    "Non-admin access restriction for Stream: %s. "
+                    "RetrieveMultiple is not supported in non-admin scenarios; "
+                    "excluding from catalog. HTTP-Error-Message: '%s'",
+                    self.tap_stream_id,
+                    error_message,
+                )
+                return False
 
-        try:
-            self.client.make_request(method='GET', endpoint=f"{endpoint}({user_id})")
-            return True
-        except MSDynamics365CrmNotFoundError as exc:
-            if "does not exist" in str(exc).lower():
-                return True
-            LOGGER.warning(
-                "Unqueryable Stream: %s, excluding from catalog. HTTP-Error-Message: '%s'",
-                self.tap_stream_id, str(exc),
-            )
-            return False
-        except MSDynamics365CrmForbiddenError as exc:
-            LOGGER.warning(
-                "Unauthorized Stream: %s, excluding from catalog. HTTP-Error-Message: '%s'",
-                self.tap_stream_id, str(exc),
-            )
-            return False
+            raise
 
 class IncrementalStream(BaseStream):
     """Base Class for Incremental Stream."""

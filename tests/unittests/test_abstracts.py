@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch, call
 from tap_ms_dynamics_365_crm.streams.abstracts import BaseStream, IncrementalStream, FullTableStream
 from tap_ms_dynamics_365_crm.client import AUTH_METHOD_AUTHORIZATION_CODE, AUTH_METHOD_CLIENT_CREDENTIALS
 from tap_ms_dynamics_365_crm.exceptions import (
+    MSDynamics365CrmBadRequestError,
     MSDynamics365CrmForbiddenError,
     MSDynamics365CrmUnauthorizedError,
     MSDynamics365CrmNotFoundError,
@@ -50,6 +51,56 @@ class TestBaseStreamCheckAccess(unittest.TestCase):
 
         self.assertFalse(stream.check_access())
 
+    def test_check_access_logs_retrieve_multiple_permission_denial(self):
+        stream, client = self._make_stream(
+            tap_stream_id="governanceconfiguration", path="governanceconfigurations"
+        )
+        error_message = (
+            "HTTP-error-code: 400, Error Code: 0x80040265, Error: "
+            "AuthenticatedUserId test-user does not have access to invoke "
+            "RetrieveMultiple on the Entity governanceconfiguration."
+        )
+        client.make_request.side_effect = MSDynamics365CrmBadRequestError(error_message)
+
+        with patch('tap_ms_dynamics_365_crm.streams.abstracts.LOGGER.warning') as warning:
+            self.assertFalse(stream.check_access())
+
+        warning.assert_called_once_with(
+            "Unauthorized Stream: %s, excluding from catalog. "
+            "Credentials do not have access to invoke RetrieveMultiple. "
+            "HTTP-Error-Message: '%s'",
+            "governanceconfiguration",
+            error_message,
+        )
+
+    def test_check_access_excludes_bare_caller_not_allowed_message(self):
+        stream, client = self._make_stream(tap_stream_id="unstructuredfilesearchentity")
+        client.make_request.side_effect = MSDynamics365CrmBadRequestError(
+            "HTTP-error-code: 400, Error Code: 0x80040265, Error: "
+            "Caller is not allowed to perform this operation"
+        )
+
+        self.assertFalse(stream.check_access())
+
+    def test_check_access_does_not_mislabel_other_bad_requests_as_permission_denials(self):
+        messages = [
+            "HTTP-error-code: 400, Error Code: 0x80040265, Error: Custom validation failed.",
+            "HTTP-error-code: 400, Error Code: 0x80040265, Error: "
+            "The caller is not allowed to perform this operation.",
+            "HTTP-error-code: 400, Error Code: 0x80000000, Error: "
+            "AuthenticatedUserId test-user does not have access to invoke RetrieveMultiple.",
+        ]
+        for error_message in messages:
+            with self.subTest(error_message=error_message):
+                stream, client = self._make_stream()
+                client.make_request.side_effect = MSDynamics365CrmBadRequestError(error_message)
+
+                with patch('tap_ms_dynamics_365_crm.streams.abstracts.LOGGER.warning') as warning:
+                    with self.assertRaises(MSDynamics365CrmBadRequestError):
+                        stream.check_access()
+
+                warning.assert_not_called()
+
     def test_check_access_reraises_not_found_errors(self):
         """404s are not treated as a known-unqueryable signature and
         propagate rather than being silently excluded."""
@@ -81,207 +132,6 @@ class TestBaseStreamCheckAccess(unittest.TestCase):
 
         with self.assertRaises(MSDynamics365CrmUnauthorizedError):
             stream.check_access()
-
-    def test_check_access_uses_plain_get_for_scoped_entities_under_client_credentials(self):
-        """Entities in SCOPED_ACCESS_CHECK_ENTITIES only need the WhoAmI-based
-        scoped check under authorization_code -- under client_credentials the
-        plain collection GET works fine, so it's used as normal."""
-        stream, client = self._make_stream(
-            tap_stream_id="msdyn_incidenttypessetup", path="msdyn_incidenttypessetups"
-        )
-        client.make_request.return_value = {"value": []}
-
-        self.assertTrue(stream.check_access())
-        client.make_request.assert_called_once_with(
-            method='GET',
-            endpoint="https://org.api.crm.dynamics.com/api/data/v9.2/msdyn_incidenttypessetups",
-            params={'$top': 1},
-        )
-
-
-class TestBaseStreamScopedAccessCheck(unittest.TestCase):
-    """Test BaseStream._check_scoped_access, used for entities in
-    SCOPED_ACCESS_CHECK_ENTITIES (msdyn_requirementdependency,
-    msdyn_incidenttypessetup) under the authorization_code auth method, where
-    they reject a plain collection GET with a 400 'Expected non-empty Guid'
-    but ARE valid, accessible entity sets."""
-
-    def _make_stream(self, tap_stream_id="msdyn_incidenttypessetup", path="msdyn_incidenttypessetups"):
-        client = MagicMock()
-        client.max_pagesize = 5000
-        client.config = {}
-        client.base_url = "https://org.api.crm.dynamics.com/api/data/v9.2"
-        client.auth_method = AUTH_METHOD_AUTHORIZATION_CODE
-        stream = ConcreteStream(client=client)
-        stream.tap_stream_id = tap_stream_id
-        stream.path = path
-        return stream, client
-
-    def test_check_access_scoped_true_on_does_not_exist_404(self):
-        """WhoAmI succeeds and the id-scoped request 404s with 'Does Not
-        Exist' -- this confirms the entity set is reachable, so access is
-        granted even though no record matches the user's id."""
-        stream, client = self._make_stream()
-        client.make_request.side_effect = [
-            {"UserId": "11111111-1111-1111-1111-111111111111", "BusinessUnitId": "bu"},
-            MSDynamics365CrmNotFoundError(
-                "HTTP-error-code: 404, Error Code: 0x80040217, Error: Entity "
-                "'msdyn_incidenttypessetup' With Id = 11111111-1111-1111-1111-111111111111 Does Not Exist"
-            ),
-        ]
-
-        self.assertTrue(stream.check_access())
-        self.assertEqual(client.make_request.call_count, 2)
-        who_am_i_call, scoped_call = client.make_request.call_args_list
-        self.assertEqual(
-            who_am_i_call.kwargs["endpoint"],
-            "https://org.api.crm.dynamics.com/api/data/v9.2/WhoAmI",
-        )
-        self.assertEqual(
-            scoped_call.kwargs["endpoint"],
-            "https://org.api.crm.dynamics.com/api/data/v9.2/msdyn_incidenttypessetups"
-            "(11111111-1111-1111-1111-111111111111)",
-        )
-
-    def test_check_access_scoped_true_on_success(self):
-        """WhoAmI succeeds and the id-scoped request returns a record (200)
-        -- access is confirmed directly."""
-        stream, client = self._make_stream(
-            tap_stream_id="msdyn_requirementdependency", path="msdyn_requirementdependencies"
-        )
-        client.make_request.side_effect = [
-            {"UserId": "22222222-2222-2222-2222-222222222222"},
-            {"msdyn_requirementdependencyid": "22222222-2222-2222-2222-222222222222"},
-        ]
-
-        self.assertTrue(stream.check_access())
-
-    def test_check_access_scoped_false_on_who_am_i_failure(self):
-        stream, client = self._make_stream()
-        client.make_request.side_effect = MSDynamics365CrmForbiddenError(
-            "HTTP-error-code: 403, Error: Forbidden."
-        )
-
-        self.assertFalse(stream.check_access())
-        client.make_request.assert_called_once()
-
-    def test_check_access_scoped_false_on_missing_user_id(self):
-        stream, client = self._make_stream()
-        client.make_request.return_value = {}
-
-        self.assertFalse(stream.check_access())
-        client.make_request.assert_called_once()
-
-    def test_check_access_scoped_false_on_forbidden_scoped_request(self):
-        stream, client = self._make_stream()
-        client.make_request.side_effect = [
-            {"UserId": "33333333-3333-3333-3333-333333333333"},
-            MSDynamics365CrmForbiddenError("HTTP-error-code: 403, Error: Forbidden."),
-        ]
-
-        self.assertFalse(stream.check_access())
-
-    def test_check_access_scoped_reraises_unrelated_404(self):
-        """A 404 that doesn't mention 'Does Not Exist' isn't a confirmed
-        signature, so it's treated as inaccessible (excluded) rather than
-        silently granted."""
-        stream, client = self._make_stream()
-        client.make_request.side_effect = [
-            {"UserId": "44444444-4444-4444-4444-444444444444"},
-            MSDynamics365CrmNotFoundError(
-                "HTTP-error-code: 404, Error Code: 0x80060888, Error: Resource not found "
-                "for the segment 'msdyn_incidenttypessetups'."
-            ),
-        ]
-
-        self.assertFalse(stream.check_access())
-
-
-class TestBaseStreamScopedRecordExtraction(unittest.TestCase):
-    """Test BaseStream.get_records/_get_scoped_records for entities in
-    SCOPED_ACCESS_CHECK_ENTITIES under authorization_code -- sync must use
-    the same WhoAmI + id-scoped GET as check_access, since the normal
-    collection GET isn't supported for these entities under that auth
-    method."""
-
-    def _make_stream(self, tap_stream_id="msdyn_incidenttypessetup", path="msdyn_incidenttypessetups",
-                      auth_method=AUTH_METHOD_AUTHORIZATION_CODE):
-        client = MagicMock()
-        client.max_pagesize = 5000
-        client.config = {}
-        client.base_url = "https://org.api.crm.dynamics.com/api/data/v9.2"
-        client.auth_method = auth_method
-        stream = ConcreteStream(client=client)
-        stream.tap_stream_id = tap_stream_id
-        stream.path = path
-        stream.url_endpoint = stream.get_url_endpoint()
-        return stream, client
-
-    def test_get_records_yields_scoped_record_on_success(self):
-        stream, client = self._make_stream()
-        client.make_request.side_effect = [
-            {"UserId": "55555555-5555-5555-5555-555555555555"},
-            {"msdyn_incidenttypessetupid": "55555555-5555-5555-5555-555555555555"},
-        ]
-
-        records = list(stream.get_records())
-        self.assertEqual(records, [{"msdyn_incidenttypessetupid": "55555555-5555-5555-5555-555555555555"}])
-        who_am_i_call, scoped_call = client.make_request.call_args_list
-        self.assertEqual(
-            scoped_call.kwargs["endpoint"],
-            "https://org.api.crm.dynamics.com/api/data/v9.2/msdyn_incidenttypessetups"
-            "(55555555-5555-5555-5555-555555555555)",
-        )
-
-    def test_get_records_yields_nothing_on_does_not_exist_404(self):
-        stream, client = self._make_stream()
-        client.make_request.side_effect = [
-            {"UserId": "66666666-6666-6666-6666-666666666666"},
-            MSDynamics365CrmNotFoundError(
-                "HTTP-error-code: 404, Error Code: 0x80040217, Error: Entity "
-                "'msdyn_incidenttypessetup' With Id = 66666666-6666-6666-6666-666666666666 Does Not Exist"
-            ),
-        ]
-
-        self.assertEqual(list(stream.get_records()), [])
-
-    def test_get_records_yields_nothing_when_who_am_i_fails(self):
-        stream, client = self._make_stream()
-        client.make_request.side_effect = MSDynamics365CrmForbiddenError(
-            "HTTP-error-code: 403, Error: Forbidden."
-        )
-
-        self.assertEqual(list(stream.get_records()), [])
-        client.make_request.assert_called_once()
-
-    def test_get_records_reraises_unrelated_404(self):
-        stream, client = self._make_stream()
-        client.make_request.side_effect = [
-            {"UserId": "77777777-7777-7777-7777-777777777777"},
-            MSDynamics365CrmNotFoundError(
-                "HTTP-error-code: 404, Error Code: 0x80060888, Error: Resource not found "
-                "for the segment 'msdyn_incidenttypessetups'."
-            ),
-        ]
-
-        with self.assertRaises(MSDynamics365CrmNotFoundError):
-            list(stream.get_records())
-
-    def test_get_records_uses_normal_pagination_under_client_credentials(self):
-        """Under client_credentials, scoped entities fall back to the normal
-        paginated collection GET, since it works fine for that auth method."""
-        stream, client = self._make_stream(auth_method=AUTH_METHOD_CLIENT_CREDENTIALS)
-        client.make_request.return_value = {"value": [{"id": "1"}]}
-
-        records = list(stream.get_records())
-        self.assertEqual(records, [{"id": "1"}])
-        client.make_request.assert_called_once_with(
-            'GET',
-            "https://org.api.crm.dynamics.com/api/data/v9.2/msdyn_incidenttypessetups",
-            headers=stream.headers,
-            params=stream.params,
-        )
-
 
 class TestBaseStreamPagination(unittest.TestCase):
     """Test pagination behavior in BaseStream.get_records"""
@@ -460,6 +310,18 @@ class TestBaseStreamPagination(unittest.TestCase):
 
 class TestBaseStreamHelperMethods(unittest.TestCase):
     """Test helper methods in BaseStream"""
+
+    def test_page_size_defaults_and_overrides(self):
+        for config, maximum, expected in (
+            ({}, 5000, 5000),
+            ({"page_size": 250}, 5000, 250),
+            ({}, 500, 500),
+            ({"page_size": 1000}, 500, 500),
+        ):
+            with self.subTest(config=config, maximum=maximum):
+                client = MagicMock(max_pagesize=maximum)
+                client.config = config
+                self.assertEqual(ConcreteStream(client=client).page_size, expected)
 
     def test_update_header(self):
         """Test update_header method"""
