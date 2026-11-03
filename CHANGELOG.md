@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.1
+  * Added `msdynmkt_eventmetadata`, `msdynmkt_eventparametermetadata`, `powerbidatasetapdx`, and `ribbonmetadatatoprocess` to `INCLUDED_ENTITIES`. [#10](https://github.com/singer-io/tap-ms-dynamics-365-crm/pull/10)
+
 ## 1.0.0
   * Added new entities to `INCLUDED_ENTITIES` and updated integration test accordingly.[#9](https://github.com/singer-io/tap-ms-dynamics-365-crm/pull/9)
   * `incidentresolution`, `msdyn_bookingalert`, `serviceappointment`, and custom activity entities switch from `FULL_TABLE` to `INCREMENTAL` on re-discovery. Re-discover and full-resync these streams.
