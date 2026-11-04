@@ -123,6 +123,7 @@ def get_streams(client: Client, create_schema: bool = True) -> dict:
     """
     from tap_ms_dynamics_365_crm.streams import (
         INCLUDED_ENTITIES, EXCLUDED_ENTITIES, CLIENT_CREDENTIALS_ONLY_STREAMS,
+        ENTITY_SET_NAME_OVERRIDES,
     )
     included_entities = INCLUDED_ENTITIES
     excluded_entities = EXCLUDED_ENTITIES
@@ -134,7 +135,9 @@ def get_streams(client: Client, create_schema: bool = True) -> dict:
     # dynamically build streams by iterating over entities and calling build_schema()
     for stream in build_entity_metadata(client, included_entities):
         stream_name = stream.get('LogicalName')
-        stream_endpoint = stream.get('EntitySetName') or ''
+        # Some internal/system entities report an EntitySetName casing that
+        # does not match their actual (case-sensitive) registered route.
+        stream_endpoint = ENTITY_SET_NAME_OVERRIDES.get(stream_name) or stream.get('EntitySetName') or ''
         stream_key = stream.get('Key')
         LOGGER.info('Processing stream: {}'.format(stream_name))
 

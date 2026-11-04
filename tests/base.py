@@ -9776,6 +9776,48 @@ EXPECTED_METADATA_RAW = json.loads('''
         ],
         "obeys_start_date": true,
         "api_limit": 100
+    },
+    "msdynmkt_eventmetadata": {
+        "primary_keys": [
+            "msdynmkt_eventmetadataid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdynmkt_eventparametermetadata": {
+        "primary_keys": [
+            "msdynmkt_eventparametermetadataid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "powerbidatasetapdx": {
+        "primary_keys": [
+            "powerbidatasetapdxid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "ribbonmetadatatoprocess": {
+        "primary_keys": [
+            "ribbonmetadatarowid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
     }
 }
 ''')

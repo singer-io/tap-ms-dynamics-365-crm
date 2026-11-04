@@ -24,7 +24,6 @@ EXCLUDED_ENTITIES = {
     'optionset',
     'organizationdatasyncsubscription',
     'postregarding',
-    'ribbonmetadatatoprocess',
     'runtimedependency',
     'similarityrule',
     'subscriptionmanuallytrackedobject',
@@ -504,6 +503,9 @@ CLIENT_CREDENTIALS_ONLY_STREAMS = {
     'workflowmetadata',
     'workqueue',
     'workqueueitem',
+    'msdynmkt_eventmetadata',
+    'msdynmkt_eventparametermetadata',
+    'powerbidatasetapdx',
 }
 
 INCLUDED_ENTITIES = {
@@ -1236,7 +1238,17 @@ INCLUDED_ENTITIES = {
         'workflow',
         'workflowcardconnections',
         'workflowlog',
+        'ribbonmetadatatoprocess'
     }   # Add any entities you explicitly want to include here
+}
+
+# EntityDefinitions.EntitySetName is normally authoritative for the Web API
+# collection URL segment, but a handful of internal/system entities report a
+# casing that does not match their actual (case-sensitive) registered route,
+# causing a 404 "Resource not found for the segment" error. Map those
+# logical names to the correct endpoint casing here.
+ENTITY_SET_NAME_OVERRIDES = {
+    'ribbonmetadatatoprocess': 'ribbonmetadatasettoprocess',
 }
 
 STREAMS = {}
