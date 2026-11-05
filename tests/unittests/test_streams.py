@@ -13,7 +13,6 @@ from tap_ms_dynamics_365_crm.client import (
     AUTH_METHOD_CLIENT_CREDENTIALS,
 )
 from tap_ms_dynamics_365_crm.exceptions import MSDynamics365CrmForbiddenError
-from tap_ms_dynamics_365_crm.streams import CLIENT_CREDENTIALS_ONLY_STREAMS, INCLUDED_ENTITIES
 
 
 class TestMetadataAccessErrors(unittest.TestCase):
@@ -32,7 +31,7 @@ class TestMetadataAccessErrors(unittest.TestCase):
                         if endpoint == 'EntityDefinitions':
                             list(call_entity_definitions(client))
                         else:
-                            list(build_entity_metadata(client, {}))
+                            list(build_entity_metadata(client))
 
                 message = str(raised.exception)
                 self.assertIn(f"'{endpoint}'", message)
@@ -51,7 +50,7 @@ class TestMetadataAccessErrors(unittest.TestCase):
 
         with patch('tap_ms_dynamics_365_crm.streams.streams.LOGGER.error') as log:
             with self.assertRaises(ValueError) as raised:
-                list(build_entity_metadata(client, {}))
+                list(build_entity_metadata(client))
 
         self.assertIs(raised.exception, original)
         log.assert_not_called()
@@ -68,34 +67,6 @@ class TestGetStreamsAccessFiltering(unittest.TestCase):
             "Key": key,
             "Properties": {},
         }
-
-    @patch.object(BaseStream, 'check_access', autospec=True, return_value=True)
-    @patch('tap_ms_dynamics_365_crm.streams.streams.build_entity_metadata')
-    @patch('tap_ms_dynamics_365_crm.streams.streams.flatten_entity_attributes')
-    def test_guid_error_streams_require_client_credentials(
-        self, mock_flatten, mock_build_entity_metadata, mock_check_access
-    ):
-        self.assertEqual(len(CLIENT_CREDENTIALS_ONLY_STREAMS), 469)
-        self.assertEqual(
-            INCLUDED_ENTITIES["client_credentials_entities"],
-            CLIENT_CREDENTIALS_ONLY_STREAMS,
-        )
-        mock_build_entity_metadata.return_value = [
-            self._entity(name) for name in sorted(CLIENT_CREDENTIALS_ONLY_STREAMS)
-        ]
-        mock_flatten.return_value = {'modifiedon': {'type': 'Edm.DateTimeOffset'}}
-        for auth_method in (AUTH_METHOD_AUTHORIZATION_CODE, AUTH_METHOD_CLIENT_CREDENTIALS):
-            for create_schema in (True, False):
-                with self.subTest(auth_method=auth_method, create_schema=create_schema):
-                    client = MagicMock(max_pagesize=5000, auth_method=auth_method)
-                    client.config = {}
-                    streams = get_streams(client, create_schema=create_schema)
-                    self.assertEqual(
-                        set(streams),
-                        CLIENT_CREDENTIALS_ONLY_STREAMS
-                        if auth_method == AUTH_METHOD_CLIENT_CREDENTIALS else set(),
-                    )
-        self.assertEqual(mock_check_access.call_count, 469)
 
     @patch.object(BaseStream, 'check_access', autospec=True)
     @patch('tap_ms_dynamics_365_crm.streams.streams.build_entity_metadata')
@@ -194,16 +165,15 @@ class TestGetStreamsAccessFiltering(unittest.TestCase):
     @patch.object(BaseStream, 'check_access', autospec=True, return_value=True)
     @patch('tap_ms_dynamics_365_crm.streams.streams.build_entity_metadata')
     @patch('tap_ms_dynamics_365_crm.streams.streams.flatten_entity_attributes')
-    def test_aaduser_is_only_available_with_authorization_code(
+    def test_aaduser_is_available_regardless_of_auth_method(
         self, mock_flatten, mock_build_entity_metadata, mock_check_access
     ):
+        """Entity availability is no longer gated by a static auth-method
+        allow-list; check_access() is the sole arbiter of inclusion."""
         mock_build_entity_metadata.return_value = [self._entity('aaduser')]
         mock_flatten.return_value = {'modifiedon': {'type': 'Edm.DateTimeOffset'}}
 
-        for auth_method, expected in (
-            (AUTH_METHOD_AUTHORIZATION_CODE, True),
-            (AUTH_METHOD_CLIENT_CREDENTIALS, False),
-        ):
+        for auth_method in (AUTH_METHOD_AUTHORIZATION_CODE, AUTH_METHOD_CLIENT_CREDENTIALS):
             for create_schema in (True, False):
                 client = MagicMock()
                 client.max_pagesize = 5000
@@ -212,9 +182,9 @@ class TestGetStreamsAccessFiltering(unittest.TestCase):
 
                 streams = get_streams(client, create_schema=create_schema)
 
-                self.assertEqual('aaduser' in streams, expected)
+                self.assertIn('aaduser', streams)
 
-        self.assertEqual(mock_check_access.call_count, 1)
+        self.assertEqual(mock_check_access.call_count, 2)
 
     @patch('tap_ms_dynamics_365_crm.streams.streams.build_entity_metadata')
     @patch('tap_ms_dynamics_365_crm.streams.streams.flatten_entity_attributes')
@@ -293,7 +263,7 @@ class TestCallEntityDefinitions(unittest.TestCase):
             method='GET',
             params={
                 "$select": (
-                    "MetadataId,LogicalName,EntitySetName,IsCustomEntity,IsManaged,"
+                    "MetadataId,LogicalName,EntitySetName,IsIntersect,"
                     "PrimaryIdAttribute"
                 ),
                 "$count": "true",
@@ -307,35 +277,37 @@ class TestBuildEntityMetadata(unittest.TestCase):
 
     @patch('tap_ms_dynamics_365_crm.streams.streams.transform_metadata_xml')
     @patch('tap_ms_dynamics_365_crm.streams.streams.call_entity_definitions')
-    def test_yields_custom_and_included_entities_present_in_metadata(
+    def test_yields_entities_present_in_metadata_excluding_intersect(
         self, mock_call_entity_definitions, mock_transform_metadata_xml
     ):
+        """Every entity returned by EntityDefinitions and found in $metadata is
+        yielded, regardless of custom/managed status, except IsIntersect
+        (N:N relationship/junction) entities."""
         mock_call_entity_definitions.return_value = [
-            {"LogicalName": "new_customentity", "IsCustomEntity": True, "IsManaged": False,
+            {"LogicalName": "new_customentity", "IsIntersect": False,
              "EntitySetName": "new_customentities"},
-            {"LogicalName": "account", "IsCustomEntity": False, "IsManaged": True,
+            {"LogicalName": "account", "IsIntersect": False,
              "EntitySetName": "accounts"},
-            {"LogicalName": "not_in_metadata", "IsCustomEntity": True, "IsManaged": False,
+            {"LogicalName": "not_in_metadata", "IsIntersect": False,
              "EntitySetName": "not_in_metadatas"},
-            {"LogicalName": "contact", "IsCustomEntity": False, "IsManaged": True,
-             "EntitySetName": "contacts"},
+            {"LogicalName": "contact_relationship", "IsIntersect": True,
+             "EntitySetName": "contact_relationshipset"},
         ]
         mock_transform_metadata_xml.return_value = {
             "new_customentity": {},
             "account": {},
-            "contact": {},
+            "contact_relationship": {},
         }
 
         client = MagicMock()
-        included_entities = {"sales": {"account"}}
 
-        results = list(build_entity_metadata(client, included_entities))
+        results = list(build_entity_metadata(client))
         result_names = [r["LogicalName"] for r in results]
 
         self.assertIn("new_customentity", result_names)
         self.assertIn("account", result_names)
         self.assertNotIn("not_in_metadata", result_names)
-        self.assertNotIn("contact", result_names)
+        self.assertNotIn("contact_relationship", result_names)
 
     @patch('tap_ms_dynamics_365_crm.streams.streams.transform_metadata_xml')
     @patch('tap_ms_dynamics_365_crm.streams.streams.call_entity_definitions')
@@ -346,17 +318,16 @@ class TestBuildEntityMetadata(unittest.TestCase):
         systemuser) is authoritative and must override whatever Key the
         $metadata XML parse produced."""
         mock_call_entity_definitions.return_value = [
-            {"LogicalName": "systemuser", "IsCustomEntity": False, "IsManaged": True,
-             "EntitySetName": "systemusers", "PrimaryIdAttribute": "systemuserid"},
+            {"LogicalName": "systemuser", "EntitySetName": "systemusers",
+             "PrimaryIdAttribute": "systemuserid"},
         ]
         mock_transform_metadata_xml.return_value = {
             "systemuser": {"Key": "ownerid"},
         }
 
         client = MagicMock()
-        included_entities = {"org_core_metadata": {"systemuser"}}
 
-        results = list(build_entity_metadata(client, included_entities))
+        results = list(build_entity_metadata(client))
 
         self.assertEqual(results[0]["Key"], "systemuserid")
 
@@ -368,17 +339,15 @@ class TestBuildEntityMetadata(unittest.TestCase):
         """Falls back to the $metadata XML's Key if EntityDefinitions doesn't
         return a PrimaryIdAttribute for some reason."""
         mock_call_entity_definitions.return_value = [
-            {"LogicalName": "account", "IsCustomEntity": False, "IsManaged": True,
-             "EntitySetName": "accounts"},
+            {"LogicalName": "account", "EntitySetName": "accounts"},
         ]
         mock_transform_metadata_xml.return_value = {
             "account": {"Key": "accountid"},
         }
 
         client = MagicMock()
-        included_entities = {"sales": {"account"}}
 
-        results = list(build_entity_metadata(client, included_entities))
+        results = list(build_entity_metadata(client))
 
         self.assertEqual(results[0]["Key"], "accountid")
 
@@ -415,8 +384,7 @@ class TestGetStreamsInheritedReplicationKey(unittest.TestCase):
     @patch('tap_ms_dynamics_365_crm.streams.streams.call_entity_definitions')
     def test_derived_activity_entity_uses_incremental_replication(self, mock_call_entity_definitions):
         mock_call_entity_definitions.return_value = [
-            {"LogicalName": "email", "IsCustomEntity": False, "IsManaged": True,
-             "EntitySetName": "emails"},
+            {"LogicalName": "email", "EntitySetName": "emails"},
         ]
 
         client = MagicMock()
@@ -424,10 +392,7 @@ class TestGetStreamsInheritedReplicationKey(unittest.TestCase):
         client.max_pagesize = 5000
         client.config = {}
 
-        included_entities = {"field_service": {"email"}}
-        with patch('tap_ms_dynamics_365_crm.streams.INCLUDED_ENTITIES', included_entities), \
-             patch('tap_ms_dynamics_365_crm.streams.EXCLUDED_ENTITIES', set()):
-            streams = get_streams(client, create_schema=False)
+        streams = get_streams(client, create_schema=False)
 
         self.assertIn("email", streams)
         self.assertEqual(streams["email"].replication_method, "INCREMENTAL")

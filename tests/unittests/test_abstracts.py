@@ -1,13 +1,16 @@
 import unittest
 from unittest.mock import MagicMock, patch, call
+import requests
 from tap_ms_dynamics_365_crm.streams.abstracts import BaseStream, IncrementalStream, FullTableStream
 from tap_ms_dynamics_365_crm.client import AUTH_METHOD_AUTHORIZATION_CODE, AUTH_METHOD_CLIENT_CREDENTIALS
 from tap_ms_dynamics_365_crm.exceptions import (
+    MSDynamics365CrmAuthenticationError,
     MSDynamics365CrmBadRequestError,
     MSDynamics365CrmForbiddenError,
     MSDynamics365CrmUnauthorizedError,
     MSDynamics365CrmNotFoundError,
     MSDynamics365CrmMethodNotAllowedError,
+    MSDynamics365CrmConflictError,
 )
 
 
@@ -83,6 +86,9 @@ class TestBaseStreamCheckAccess(unittest.TestCase):
         self.assertFalse(stream.check_access())
 
     def test_check_access_does_not_mislabel_other_bad_requests_as_permission_denials(self):
+        """These Bad Request messages don't match either known permission-denial
+        signature, so they fall through to the generic 'unrecognized' warning
+        rather than the specific RetrieveMultiple-denial message."""
         messages = [
             "HTTP-error-code: 400, Error Code: 0x80040265, Error: Custom validation failed.",
             "HTTP-error-code: 400, Error Code: 0x80040265, Error: "
@@ -96,14 +102,18 @@ class TestBaseStreamCheckAccess(unittest.TestCase):
                 client.make_request.side_effect = MSDynamics365CrmBadRequestError(error_message)
 
                 with patch('tap_ms_dynamics_365_crm.streams.abstracts.LOGGER.warning') as warning:
-                    with self.assertRaises(MSDynamics365CrmBadRequestError):
-                        stream.check_access()
+                    self.assertFalse(stream.check_access())
 
-                warning.assert_not_called()
+                warning.assert_called_once_with(
+                    "Stream: %s excluded from catalog due to an unrecognized Bad "
+                    "Request error. HTTP-Error-Message: '%s'",
+                    stream.tap_stream_id,
+                    error_message,
+                )
 
-    def test_check_access_reraises_not_found_errors(self):
-        """404s are not treated as a known-unqueryable signature and
-        propagate rather than being silently excluded."""
+    def test_check_access_excludes_not_found_errors(self):
+        """404s (e.g. an EntitySetName casing mismatch) must not abort
+        discovery for the rest of the catalog; the stream is excluded."""
         stream, client = self._make_stream(
             tap_stream_id="attributepicklistvalue", path="attributepicklistvalues"
         )
@@ -112,26 +122,103 @@ class TestBaseStreamCheckAccess(unittest.TestCase):
             "for the segment 'AttributePicklistValues'."
         )
 
-        with self.assertRaises(MSDynamics365CrmNotFoundError):
-            stream.check_access()
+        with patch('tap_ms_dynamics_365_crm.streams.abstracts.LOGGER.warning') as warning:
+            self.assertFalse(stream.check_access())
 
-    def test_check_access_reraises_method_not_allowed_errors(self):
+        warning.assert_called_once()
+
+    def test_check_access_excludes_method_not_allowed_errors(self):
         stream, client = self._make_stream(tap_stream_id="some_entity")
         client.make_request.side_effect = MSDynamics365CrmMethodNotAllowedError(
             "HTTP-error-code: 405, Error: Method Not Allowed."
         )
 
-        with self.assertRaises(MSDynamics365CrmMethodNotAllowedError):
-            stream.check_access()
+        with patch('tap_ms_dynamics_365_crm.streams.abstracts.LOGGER.warning') as warning:
+            self.assertFalse(stream.check_access())
 
-    def test_check_access_reraises_unrelated_errors(self):
+        warning.assert_called_once()
+
+    def test_check_access_excludes_unrelated_http_errors(self):
+        """Any MSDynamics365CrmError subclass not already given a specific
+        branch above (e.g. 409 Conflict) still results in exclusion with
+        a logged warning instead of a crash."""
         stream, client = self._make_stream(tap_stream_id="some_entity")
-        client.make_request.side_effect = MSDynamics365CrmUnauthorizedError(
-            "HTTP-error-code: 401, Error: Unauthorized."
+        client.make_request.side_effect = MSDynamics365CrmConflictError(
+            "HTTP-error-code: 409, Error: Conflict."
         )
 
-        with self.assertRaises(MSDynamics365CrmUnauthorizedError):
-            stream.check_access()
+        with patch('tap_ms_dynamics_365_crm.streams.abstracts.LOGGER.warning') as warning:
+            self.assertFalse(stream.check_access())
+
+        warning.assert_called_once()
+
+    def test_check_access_propagates_authentication_failures(self):
+        """A failure to acquire/refresh an access token means the credentials
+        themselves are broken for every subsequent request, not just this
+        one entity -- it must be logged as an error and re-raised rather
+        than silently excluding the stream."""
+        stream, client = self._make_stream(tap_stream_id="some_entity")
+        client.make_request.side_effect = MSDynamics365CrmAuthenticationError(
+            "Failed to acquire access token using client_credentials. "
+            "error=invalid_client, description=AADSTS7000215: Invalid client secret is provided."
+        )
+
+        with patch('tap_ms_dynamics_365_crm.streams.abstracts.LOGGER.error') as error_log, \
+             patch('tap_ms_dynamics_365_crm.streams.abstracts.LOGGER.warning') as warning_log:
+            with self.assertRaises(MSDynamics365CrmAuthenticationError):
+                stream.check_access()
+
+        error_log.assert_called_once()
+        warning_log.assert_not_called()
+
+    def test_check_access_propagates_401_unauthorized(self):
+        """A 401 from a live API call means the current token is no longer
+        valid for any request, not just this entity -- it must propagate
+        rather than being excluded like a per-entity permission error."""
+        stream, client = self._make_stream(tap_stream_id="some_entity")
+        client.make_request.side_effect = MSDynamics365CrmUnauthorizedError(
+            "HTTP-error-code: 401, Error: Unauthorized. The access token is missing, expired, or invalid."
+        )
+
+        with patch('tap_ms_dynamics_365_crm.streams.abstracts.LOGGER.error') as error_log, \
+             patch('tap_ms_dynamics_365_crm.streams.abstracts.LOGGER.warning') as warning_log:
+            with self.assertRaises(MSDynamics365CrmUnauthorizedError):
+                stream.check_access()
+
+        error_log.assert_called_once()
+        warning_log.assert_not_called()
+
+    def test_check_access_excludes_requests_transport_errors(self):
+        """Transport-level failures from the requests library (connection
+        errors, timeouts) that survive the client's own retry/backoff are
+        treated as HTTP-related and exclude the stream rather than crash."""
+        for transport_exc in (
+            requests.exceptions.ConnectionError("Connection aborted"),
+            requests.exceptions.Timeout("Request timed out"),
+            requests.exceptions.ChunkedEncodingError("Connection broken"),
+            ConnectionResetError("Connection reset by peer"),
+        ):
+            with self.subTest(exception=type(transport_exc).__name__):
+                stream, client = self._make_stream(tap_stream_id="some_entity")
+                client.make_request.side_effect = transport_exc
+
+                with patch('tap_ms_dynamics_365_crm.streams.abstracts.LOGGER.warning') as warning:
+                    self.assertFalse(stream.check_access())
+
+                warning.assert_called_once()
+
+    def test_check_access_propagates_non_http_errors(self):
+        """A bug in check_access() itself (or any error unrelated to HTTP/
+        transport) must propagate rather than being silently swallowed as
+        an excluded stream, so real defects aren't hidden."""
+        stream, client = self._make_stream(tap_stream_id="some_entity")
+        client.make_request.side_effect = TypeError("unexpected programming error")
+
+        with patch('tap_ms_dynamics_365_crm.streams.abstracts.LOGGER.warning') as warning:
+            with self.assertRaises(TypeError):
+                stream.check_access()
+
+        warning.assert_not_called()
 
 class TestBaseStreamPagination(unittest.TestCase):
     """Test pagination behavior in BaseStream.get_records"""

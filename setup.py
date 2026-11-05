@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 
 setup(name="tap-ms-dynamics-365-crm",
-      version="1.0.1",
+      version="1.1.0",
       description="Singer.io tap for extracting data from ms-dynamics-365-crm API",
       author="Stitch",
       url="http://singer.io",

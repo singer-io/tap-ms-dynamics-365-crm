@@ -7,6 +7,15 @@ class MSDynamics365CrmError(Exception):
         self.response = response
 
 
+class MSDynamics365CrmAuthenticationError(MSDynamics365CrmError):
+    """class representing a failure to acquire or refresh an access token
+    (OAuth/token-endpoint failure). This is distinct from a per-entity HTTP
+    error: it means the configured credentials themselves are invalid,
+    expired, or have been revoked, and no further request can succeed until
+    that is fixed. Callers must not treat this the same as a single
+    inaccessible stream."""
+    pass
+
 class MSDynamics365CrmBackoffError(MSDynamics365CrmError):
     """class representing backoff error handling."""
     pass

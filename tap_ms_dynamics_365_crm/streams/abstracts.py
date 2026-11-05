@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Iterator
+import requests
 from singer import (
     Transformer,
     get_bookmark,
@@ -12,6 +13,9 @@ from singer import (
 )
 from tap_ms_dynamics_365_crm.client import Client, MAX_PAGESIZE
 from tap_ms_dynamics_365_crm.exceptions import (
+    MSDynamics365CrmError,
+    MSDynamics365CrmAuthenticationError,
+    MSDynamics365CrmUnauthorizedError,
     MSDynamics365CrmForbiddenError,
     MSDynamics365CrmBadRequestError
 )
@@ -167,16 +171,40 @@ class BaseStream(ABC):
     def check_access(self) -> bool:
         """
         Verifies that the credentials can read at least one record from this
-        stream's entity set. Returns False when the entity set isn't plainly
-        queryable via a simple GET:
+        stream's entity set. Returns False (and logs a warning, never raises)
+        whenever the entity set isn't plainly queryable via a simple GET:
          - 403 Forbidden: credentials lack access to the entity.
          - 400 Bad Request with a RetrieveMultiple permission denial.
+         - Any other HTTP/transport-level error (404, 5xx, connection reset,
+           timeout, etc.): a single entity failing access verification must
+           never abort discovery for the rest of the catalog.
+        Any non-HTTP error (e.g. a bug in this method) is not caught here and
+        propagates, since silently excluding a stream for an unrelated
+        programming error would hide real defects.
+
+        Credential/authentication failures (a failure to acquire or refresh
+        an access token, or a 401 from a live API call) are NOT treated as a
+        per-entity access problem: they mean the configured credentials are
+        invalid, expired, or have been revoked, so no further request can
+        succeed either. These are logged as an error and re-raised so the
+        whole discovery run fails loudly instead of silently excluding every
+        remaining entity one at a time.
         """
         endpoint = self.get_url_endpoint()
 
         try:
             self.client.make_request(method='GET', endpoint=endpoint, params={'$top': 1})
             return True
+        except (MSDynamics365CrmAuthenticationError, MSDynamics365CrmUnauthorizedError) as exc:
+            LOGGER.error(
+                "Stream: %s access check aborted due to a credentials/"
+                "authentication failure, not a per-entity access problem. "
+                "This likely means the configured credentials are invalid, "
+                "expired, or have been revoked. Error: '%s'",
+                self.tap_stream_id,
+                str(exc),
+            )
+            raise
         except MSDynamics365CrmForbiddenError as exc:
             LOGGER.warning(
                 "Unauthorized Stream: %s, excluding from catalog. HTTP-Error-Message: '%s'",
@@ -218,7 +246,22 @@ class BaseStream(ABC):
                 )
                 return False
 
-            raise
+            LOGGER.warning(
+                "Stream: %s excluded from catalog due to an unrecognized Bad "
+                "Request error. HTTP-Error-Message: '%s'",
+                self.tap_stream_id,
+                error_message,
+            )
+            return False
+        except (MSDynamics365CrmError, requests.exceptions.RequestException,
+                ConnectionResetError) as exc:
+            LOGGER.warning(
+                "Stream: %s excluded from catalog due to an unexpected HTTP/"
+                "transport error while verifying access. Error: '%s'",
+                self.tap_stream_id,
+                str(exc),
+            )
+            return False
 
 class IncrementalStream(BaseStream):
     """Base Class for Incremental Stream."""
