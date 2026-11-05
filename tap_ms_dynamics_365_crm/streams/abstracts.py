@@ -17,7 +17,6 @@ from tap_ms_dynamics_365_crm.exceptions import (
     MSDynamics365CrmAuthenticationError,
     MSDynamics365CrmUnauthorizedError,
     MSDynamics365CrmBackoffError,
-    MSDynamics365CrmUnprocessableEntityError,
     MSDynamics365CrmForbiddenError,
     MSDynamics365CrmBadRequestError
 )
@@ -218,9 +217,9 @@ class BaseStream(ABC):
             )
             raise
         except (
-            MSDynamics365CrmBackoffError, MSDynamics365CrmUnprocessableEntityError,
-            ConnectionResetError, requests.exceptions.ConnectionError,
-            requests.exceptions.ChunkedEncodingError, requests.exceptions.Timeout,
+            MSDynamics365CrmBackoffError, ConnectionResetError,
+            requests.exceptions.ConnectionError,requests.exceptions.ChunkedEncodingError,
+            requests.exceptions.Timeout
         ) as exc:
             LOGGER.error(
                 "Stream: %s access check could not be completed: a retryable "

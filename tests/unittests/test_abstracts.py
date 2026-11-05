@@ -223,7 +223,6 @@ class TestBaseStreamCheckAccess(unittest.TestCase):
         for backoff_exc in (
             MSDynamics365CrmRateLimitError("HTTP-error-code: 429, Error: Too many requests."),
             MSDynamics365CrmServiceUnavailableError("HTTP-error-code: 503, Error: Service unavailable."),
-            MSDynamics365CrmUnprocessableEntityError("HTTP-error-code: 422, Error: Unprocessable entity."),
         ):
             with self.subTest(exception=type(backoff_exc).__name__):
                 stream, client = self._make_stream(tap_stream_id="some_entity")
@@ -236,6 +235,21 @@ class TestBaseStreamCheckAccess(unittest.TestCase):
 
                 error_log.assert_called_once()
                 warning_log.assert_not_called()
+
+    def test_check_access_excludes_unprocessable_entity_error(self):
+        """422 is a semantic/validation response about this specific
+        request, not a transient failure -- unlike the MSDynamics365CrmBackoffError
+        family, it is not retried by the client and still results in the
+        stream being excluded rather than propagated."""
+        stream, client = self._make_stream(tap_stream_id="some_entity")
+        client.make_request.side_effect = MSDynamics365CrmUnprocessableEntityError(
+            "HTTP-error-code: 422, Error: Unprocessable entity."
+        )
+
+        with patch('tap_ms_dynamics_365_crm.streams.abstracts.LOGGER.warning') as warning:
+            self.assertFalse(stream.check_access())
+
+        warning.assert_called_once()
 
     def test_check_access_propagates_non_http_errors(self):
         """A bug in check_access() itself (or any error unrelated to HTTP/
