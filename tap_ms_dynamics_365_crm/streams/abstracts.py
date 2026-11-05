@@ -16,6 +16,8 @@ from tap_ms_dynamics_365_crm.exceptions import (
     MSDynamics365CrmError,
     MSDynamics365CrmAuthenticationError,
     MSDynamics365CrmUnauthorizedError,
+    MSDynamics365CrmBackoffError,
+    MSDynamics365CrmUnprocessableEntityError,
     MSDynamics365CrmForbiddenError,
     MSDynamics365CrmBadRequestError
 )
@@ -172,12 +174,13 @@ class BaseStream(ABC):
         """
         Verifies that the credentials can read at least one record from this
         stream's entity set. Returns False (and logs a warning, never raises)
-        whenever the entity set isn't plainly queryable via a simple GET:
+        only for a *definitive* response that this entity is not accessible:
          - 403 Forbidden: credentials lack access to the entity.
          - 400 Bad Request with a RetrieveMultiple permission denial.
-         - Any other HTTP/transport-level error (404, 5xx, connection reset,
-           timeout, etc.): a single entity failing access verification must
-           never abort discovery for the rest of the catalog.
+         - 404/405/409/412/413/other non-retryable HTTP errors: the endpoint
+           itself rejected this specific request; a single entity failing
+           access verification must never abort discovery for the rest of
+           the catalog.
         Any non-HTTP error (e.g. a bug in this method) is not caught here and
         propagates, since silently excluding a stream for an unrelated
         programming error would hide real defects.
@@ -189,6 +192,15 @@ class BaseStream(ABC):
         succeed either. These are logged as an error and re-raised so the
         whole discovery run fails loudly instead of silently excluding every
         remaining entity one at a time.
+
+        Retryable transport/server failures (429, 5xx, timeouts, connection
+        errors) are also NOT treated as "inaccessible": the client's own
+        backoff already retries these internally, so reaching this method
+        means retries were exhausted without ever getting a conclusive
+        answer. Excluding the entity here would silently produce an
+        incomplete catalog that looks successful. These are logged as an
+        error and re-raised instead, so discovery fails visibly rather than
+        omitting a possibly-valid entity.
         """
         endpoint = self.get_url_endpoint()
 
@@ -201,6 +213,21 @@ class BaseStream(ABC):
                 "authentication failure, not a per-entity access problem. "
                 "This likely means the configured credentials are invalid, "
                 "expired, or have been revoked. Error: '%s'",
+                self.tap_stream_id,
+                str(exc),
+            )
+            raise
+        except (
+            MSDynamics365CrmBackoffError, MSDynamics365CrmUnprocessableEntityError,
+            ConnectionResetError, requests.exceptions.ConnectionError,
+            requests.exceptions.ChunkedEncodingError, requests.exceptions.Timeout,
+        ) as exc:
+            LOGGER.error(
+                "Stream: %s access check could not be completed: a retryable "
+                "error (rate limit, server error, timeout, or connection "
+                "failure) persisted after the client's own retries were "
+                "exhausted. This does NOT mean the entity is inaccessible -- "
+                "the check was inconclusive. Error: '%s'",
                 self.tap_stream_id,
                 str(exc),
             )
@@ -253,8 +280,7 @@ class BaseStream(ABC):
                 error_message,
             )
             return False
-        except (MSDynamics365CrmError, requests.exceptions.RequestException,
-                ConnectionResetError) as exc:
+        except (MSDynamics365CrmError, requests.exceptions.RequestException) as exc:
             LOGGER.warning(
                 "Stream: %s excluded from catalog due to an unexpected HTTP/"
                 "transport error while verifying access. Error: '%s'",

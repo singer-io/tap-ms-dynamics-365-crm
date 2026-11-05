@@ -11,6 +11,9 @@ from tap_ms_dynamics_365_crm.exceptions import (
     MSDynamics365CrmNotFoundError,
     MSDynamics365CrmMethodNotAllowedError,
     MSDynamics365CrmConflictError,
+    MSDynamics365CrmRateLimitError,
+    MSDynamics365CrmServiceUnavailableError,
+    MSDynamics365CrmUnprocessableEntityError,
 )
 
 
@@ -188,10 +191,13 @@ class TestBaseStreamCheckAccess(unittest.TestCase):
         error_log.assert_called_once()
         warning_log.assert_not_called()
 
-    def test_check_access_excludes_requests_transport_errors(self):
-        """Transport-level failures from the requests library (connection
-        errors, timeouts) that survive the client's own retry/backoff are
-        treated as HTTP-related and exclude the stream rather than crash."""
+    def test_check_access_propagates_retryable_transport_errors(self):
+        """Transport-level failures (connection errors, timeouts) that
+        survive the client's own retry/backoff mean the check was
+        inconclusive, not that the entity is inaccessible -- they must
+        propagate (logged as an error) rather than silently exclude the
+        stream, which would otherwise produce an incomplete-looking-complete
+        catalog."""
         for transport_exc in (
             requests.exceptions.ConnectionError("Connection aborted"),
             requests.exceptions.Timeout("Request timed out"),
@@ -202,10 +208,34 @@ class TestBaseStreamCheckAccess(unittest.TestCase):
                 stream, client = self._make_stream(tap_stream_id="some_entity")
                 client.make_request.side_effect = transport_exc
 
-                with patch('tap_ms_dynamics_365_crm.streams.abstracts.LOGGER.warning') as warning:
-                    self.assertFalse(stream.check_access())
+                with patch('tap_ms_dynamics_365_crm.streams.abstracts.LOGGER.error') as error_log, \
+                     patch('tap_ms_dynamics_365_crm.streams.abstracts.LOGGER.warning') as warning_log:
+                    with self.assertRaises(type(transport_exc)):
+                        stream.check_access()
 
-                warning.assert_called_once()
+                error_log.assert_called_once()
+                warning_log.assert_not_called()
+
+    def test_check_access_propagates_retryable_backoff_http_errors(self):
+        """429/5xx responses that exhaust the client's own backoff retries
+        are inconclusive, not a definitive 'this entity is inaccessible'
+        answer -- they must propagate rather than exclude the stream."""
+        for backoff_exc in (
+            MSDynamics365CrmRateLimitError("HTTP-error-code: 429, Error: Too many requests."),
+            MSDynamics365CrmServiceUnavailableError("HTTP-error-code: 503, Error: Service unavailable."),
+            MSDynamics365CrmUnprocessableEntityError("HTTP-error-code: 422, Error: Unprocessable entity."),
+        ):
+            with self.subTest(exception=type(backoff_exc).__name__):
+                stream, client = self._make_stream(tap_stream_id="some_entity")
+                client.make_request.side_effect = backoff_exc
+
+                with patch('tap_ms_dynamics_365_crm.streams.abstracts.LOGGER.error') as error_log, \
+                     patch('tap_ms_dynamics_365_crm.streams.abstracts.LOGGER.warning') as warning_log:
+                    with self.assertRaises(type(backoff_exc)):
+                        stream.check_access()
+
+                error_log.assert_called_once()
+                warning_log.assert_not_called()
 
     def test_check_access_propagates_non_http_errors(self):
         """A bug in check_access() itself (or any error unrelated to HTTP/
