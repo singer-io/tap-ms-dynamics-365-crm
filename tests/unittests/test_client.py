@@ -108,6 +108,7 @@ class TestClient(unittest.TestCase):
         ["403 error", 403, MSDynamics365CrmForbiddenError, "Forbidden. The user does not have the required Dataverse security role or privilege to perform this operation."],
         ["404 error", 404, MSDynamics365CrmNotFoundError, "Not found. The requested resource or entity record does not exist."],
         ["409 error", 409, MSDynamics365CrmConflictError, "Conflict. The operation conflicts with an existing record (duplicate detection or concurrency violation)."],
+        ["422 error", 422, MSDynamics365CrmUnprocessableEntityError, "Unprocessable entity. The request was well-formed but could not be processed."],
     ])
     def test_make_request_http_failure_without_retry(self, test_name, error_code, error, error_message):
         mock_response = MockResponse(error_code, json_data={})
@@ -119,7 +120,6 @@ class TestClient(unittest.TestCase):
         self.assertEqual(str(e.exception), expected_error_message)
 
     @parameterized.expand([
-        ["422 error", 422, MSDynamics365CrmUnprocessableEntityError, "Unprocessable entity. The request was well-formed but could not be processed."],
         ["500 error", 500, MSDynamics365CrmInternalServerError, "Internal server error. The server encountered an unexpected condition which prevented it from fulfilling the request."],
         ["501 error", 501, MSDynamics365CrmNotImplementedError, "Not implemented. The server does not support the functionality required to fulfill the request."],
         ["502 error", 502, MSDynamics365CrmBadGatewayError, "Bad gateway. An upstream proxy or load balancer received an invalid response from the MS Dynamics server."],

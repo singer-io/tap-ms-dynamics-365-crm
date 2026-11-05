@@ -18,5 +18,3 @@ ENTITY_SET_NAME_OVERRIDES = {
     'gitsolution': 'gitsolutions',
     'ribbonmetadatatoprocess': 'ribbonmetadatasettoprocess',
 }
-
-
