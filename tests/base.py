@@ -11921,17 +11921,6 @@ EXPECTED_METADATA_RAW = json.loads('''
         "obeys_start_date": true,
         "api_limit": 100
     },
-    "componentversionnrddatasource": {
-        "primary_keys": [
-            "componentversionnrddatasourceid"
-        ],
-        "replication_method": "INCREMENTAL",
-        "replication_keys": [
-            "modifiedon"
-        ],
-        "obeys_start_date": true,
-        "api_limit": 100
-    },
     "delegatedauthorization": {
         "primary_keys": [
             "delegatedauthorizationid"
