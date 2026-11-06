@@ -114,6 +114,40 @@ class TestBaseStreamCheckAccess(unittest.TestCase):
                     error_message,
                 )
 
+    @patch('tap_ms_dynamics_365_crm.streams.abstracts.time.sleep')
+    def test_check_access_retries_intermittent_elastic_parent_error(self, mock_sleep):
+        """0x80097259 is intermittent for some elastic tables; a later
+        successful probe must keep the stream in the catalog."""
+        stream, client = self._make_stream(
+            tap_stream_id="componentversionnrddatasource",
+            path="componentversionnrddatasourceset",
+        )
+        client.make_request.side_effect = [
+            MSDynamics365CrmBadRequestError(
+                "HTTP-error-code: 400, Error Code: 0x80097259, Error: This operation on "
+                "elastic child unowned table is not allowed without parent record value."
+            ),
+            {"value": []},
+        ]
+
+        self.assertTrue(stream.check_access())
+        self.assertEqual(client.make_request.call_count, 2)
+        mock_sleep.assert_called_once()
+
+    @patch('tap_ms_dynamics_365_crm.streams.abstracts.time.sleep')
+    def test_check_access_excludes_persistent_elastic_parent_error(self, mock_sleep):
+        """Entities that fail every attempt (e.g. flowlog) stay excluded."""
+        stream, client = self._make_stream(tap_stream_id="flowlog", path="flowlogs")
+        client.make_request.side_effect = MSDynamics365CrmBadRequestError(
+            "HTTP-error-code: 400, Error Code: 0x80097259, Error: This operation on "
+            "elastic child unowned table is not allowed without parent record value."
+        )
+
+        self.assertFalse(stream.check_access())
+        # 1 initial probe + 3 retries
+        self.assertEqual(client.make_request.call_count, 4)
+        self.assertEqual(mock_sleep.call_count, 3)
+
     def test_check_access_excludes_not_found_errors(self):
         """404s (e.g. an EntitySetName casing mismatch) must not abort
         discovery for the rest of the catalog; the stream is excluded."""

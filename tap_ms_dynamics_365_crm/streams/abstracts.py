@@ -1,3 +1,4 @@
+import time
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Iterator
 import requests
@@ -22,6 +23,13 @@ from tap_ms_dynamics_365_crm.exceptions import (
 )
 
 LOGGER = get_logger()
+
+# Dataverse error returned (intermittently for some elastic tables) as:
+# "This operation on elastic child unowned table is not allowed without
+# parent record value."
+ELASTIC_PARENT_REQUIRED_CODE = '0x80097259'
+ELASTIC_PARENT_REQUIRED_RETRIES = 3
+ELASTIC_PARENT_REQUIRED_RETRY_DELAY = 1  # seconds, multiplied by attempt number
 
 
 class BaseStream(ABC):
@@ -169,6 +177,31 @@ class BaseStream(ABC):
         """
         return self.url_endpoint or f"{self.client.base_url}/{self.path}"
 
+    def _retry_elastic_probe(self, endpoint: str) -> bool:
+        """
+        Re-run the access probe after an intermittent elastic-table 400
+        (0x80097259). Returns True as soon as one attempt succeeds, and False
+        if every attempt fails with the same error. Any other failure (e.g.
+        403) is treated as a definitive exclusion; credential and retryable
+        transport errors propagate to the caller as usual.
+        """
+        for attempt in range(1, ELASTIC_PARENT_REQUIRED_RETRIES + 1):
+            LOGGER.info(
+                "Stream: %s access check hit intermittent error %s; retry %d/%d",
+                self.tap_stream_id, ELASTIC_PARENT_REQUIRED_CODE,
+                attempt, ELASTIC_PARENT_REQUIRED_RETRIES,
+            )
+            time.sleep(ELASTIC_PARENT_REQUIRED_RETRY_DELAY * attempt)
+            try:
+                self.client.make_request(method='GET', endpoint=endpoint, params={'$top': 1})
+                return True
+            except MSDynamics365CrmBadRequestError as exc:
+                if ELASTIC_PARENT_REQUIRED_CODE not in str(exc).lower():
+                    return False
+            except MSDynamics365CrmForbiddenError:
+                return False
+        return False
+
     def check_access(self) -> bool:
         """
         Verifies that the credentials can read at least one record from this
@@ -271,6 +304,15 @@ class BaseStream(ABC):
                     error_message,
                 )
                 return False
+
+            if ELASTIC_PARENT_REQUIRED_CODE in error_message_lower:
+                # Dataverse intermittently returns this for elastic tables
+                # (e.g. componentversionnrddatasource) even though the same
+                # request succeeds on other attempts. Re-probe before
+                # deciding; entities that fail every attempt (e.g. flowlog)
+                # are still excluded.
+                if self._retry_elastic_probe(endpoint):
+                    return True
 
             LOGGER.warning(
                 "Stream: %s excluded from catalog due to an unrecognized Bad "
