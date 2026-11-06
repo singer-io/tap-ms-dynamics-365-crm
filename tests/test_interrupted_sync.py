@@ -125,7 +125,71 @@ class MSDynamics365CRMInterruptedSyncTest(InterruptedSyncTest, MSDynamics365CRMB
                     if self.parse_date(record[expected_replication_key]) <=
                     self.parse_date(self.get_bookmark_value(self.first_sync_state, stream))]
 
-                self.assertEqual(
-                    self._strip_volatile_fields(first_sync_records_after_bookmark),
-                    self._strip_volatile_fields(filtered_resuming_records),
-                    msg="Incorrect data in the interrupted sync")
+                self._verify_resuming_records(
+                    stream=stream,
+                    replication_key=expected_replication_key,
+                    first_sync_records=first_sync_records,
+                    first_sync_records_after_bookmark=first_sync_records_after_bookmark,
+                    resuming_sync_records=resuming_sync_records,
+                    filtered_resuming_records=filtered_resuming_records)
+
+    def _verify_resuming_records(self, stream, replication_key, first_sync_records,
+                                 first_sync_records_after_bookmark, resuming_sync_records,
+                                 filtered_resuming_records):
+        """Compare first-sync and resuming-sync records by primary key,
+        tolerating records that Dynamics 365 itself modified between the two
+        syncs.
+
+        Records can be updated by platform background jobs (for example
+        `knowledgearticle` records appear to be re-stamped periodically) while
+        the test is running, which bumps `modifiedon`. A strict list equality
+        then fails even though the tap behaved correctly, because the resuming
+        sync correctly returns the newer version of the record.
+
+        Still verified (so real tap bugs are caught):
+          - every first-sync record at/after the expected start time is
+            replicated again by the resuming sync (nothing is dropped);
+          - a record whose `modifiedon` is unchanged is identical in both syncs
+            (ignoring the volatile geocoding fields);
+          - the resuming sync does not replicate unknown records, nor records
+            older than the expected start time that were not updated upstream.
+        """
+        primary_key = next(iter(self.expected_primary_keys(stream)))
+
+        first_all_by_pk = {rec[primary_key]: rec for rec in first_sync_records}
+        first_after_by_pk = {rec[primary_key]: rec for rec in first_sync_records_after_bookmark}
+        resuming_all_by_pk = {rec[primary_key]: rec for rec in resuming_sync_records}
+        filtered_resuming_by_pk = {rec[primary_key]: rec for rec in filtered_resuming_records}
+
+        # Nothing may be dropped by the resuming sync
+        self.assertSetEqual(
+            set(first_after_by_pk) - set(resuming_all_by_pk), set(),
+            msg=f"Records from the first sync missing in the resuming sync for {stream}")
+
+        # Nothing unknown may be replicated
+        self.assertSetEqual(
+            set(filtered_resuming_by_pk) - set(first_all_by_pk), set(),
+            msg=f"Resuming sync replicated records unknown to the first sync for {stream}")
+
+        # Records replicated that the first sync did not return at/after the
+        # expected start time must have been updated upstream since.
+        for pk, resuming_record in filtered_resuming_by_pk.items():
+            if pk in first_after_by_pk:
+                continue
+            self.assertGreater(
+                self.parse_date(resuming_record[replication_key]),
+                self.parse_date(first_all_by_pk[pk][replication_key]),
+                msg=f"Record {pk} in {stream} was replicated before the expected "
+                    "resuming start time without having been updated")
+
+        for pk, first_record in first_after_by_pk.items():
+            resuming_record = resuming_all_by_pk[pk]
+            if (self.parse_date(resuming_record[replication_key]) >
+                    self.parse_date(first_record[replication_key])):
+                # Updated by Dynamics between the two syncs; the resuming sync
+                # correctly returned the newer version.
+                continue
+            self.assertEqual(
+                self._strip_volatile_fields([first_record]),
+                self._strip_volatile_fields([resuming_record]),
+                msg=f"Incorrect data in the interrupted sync for {stream} record {pk}")
