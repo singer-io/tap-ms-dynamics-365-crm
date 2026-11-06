@@ -14,7 +14,7 @@ from tap_ms_dynamics_365_crm.client import (
     REQUEST_TIMEOUT,
 )
 from tap_ms_dynamics_365_crm.exceptions import (
-    MSDynamics365CrmError,
+    MSDynamics365CrmAuthenticationError,
     MSDynamics365CrmBadRequestError,
     MSDynamics365CrmUnauthorizedError,
     MSDynamics365CrmForbiddenError,
@@ -108,6 +108,7 @@ class TestClient(unittest.TestCase):
         ["403 error", 403, MSDynamics365CrmForbiddenError, "Forbidden. The user does not have the required Dataverse security role or privilege to perform this operation."],
         ["404 error", 404, MSDynamics365CrmNotFoundError, "Not found. The requested resource or entity record does not exist."],
         ["409 error", 409, MSDynamics365CrmConflictError, "Conflict. The operation conflicts with an existing record (duplicate detection or concurrency violation)."],
+        ["422 error", 422, MSDynamics365CrmUnprocessableEntityError, "Unprocessable entity. The request was well-formed but could not be processed."],
     ])
     def test_make_request_http_failure_without_retry(self, test_name, error_code, error, error_message):
         mock_response = MockResponse(error_code, json_data={})
@@ -119,7 +120,6 @@ class TestClient(unittest.TestCase):
         self.assertEqual(str(e.exception), expected_error_message)
 
     @parameterized.expand([
-        ["422 error", 422, MSDynamics365CrmUnprocessableEntityError, "Unprocessable entity. The request was well-formed but could not be processed."],
         ["500 error", 500, MSDynamics365CrmInternalServerError, "Internal server error. The server encountered an unexpected condition which prevented it from fulfilling the request."],
         ["501 error", 501, MSDynamics365CrmNotImplementedError, "Not implemented. The server does not support the functionality required to fulfill the request."],
         ["502 error", 502, MSDynamics365CrmBadGatewayError, "Bad gateway. An upstream proxy or load balancer received an invalid response from the MS Dynamics server."],
@@ -348,7 +348,7 @@ class TestClient(unittest.TestCase):
                 "error_description": "AADSTS7000215: Invalid client secret is provided."
             }
         with patch("tap_ms_dynamics_365_crm.client.msal.ConfidentialClientApplication", return_value=mock_app):
-            with self.assertRaises(MSDynamics365CrmError) as exc:
+            with self.assertRaises(MSDynamics365CrmAuthenticationError) as exc:
                 self.client._acquire_access_token_client_credentials()
 
         self.assertIn("invalid_client", str(exc.exception))
@@ -473,13 +473,29 @@ class TestClient(unittest.TestCase):
         mock_write_config.assert_called_once_with("rotated-refresh-token")
 
     def test_refresh_access_token_non_200_raises(self):
-        """Test _refresh_access_token raises when the token endpoint returns non-200"""
-        mock_response = MockResponse(400, json_data={})
+        """Test _refresh_access_token raises MSDynamics365CrmAuthenticationError
+        when the token endpoint returns non-200, surfacing AAD error details."""
+        mock_response = MockResponse(
+            400, json_data={"error": "invalid_grant", "error_description": "AADSTS70008: expired refresh token."}
+        )
         with patch.object(self.client._session, "post", return_value=mock_response):
-            with self.assertRaises(MSDynamics365CrmError) as e:
+            with self.assertRaises(MSDynamics365CrmAuthenticationError) as e:
                 self.client._refresh_access_token()
 
-        self.assertIn("Non-200 response", str(e.exception))
+        self.assertIn("400", str(e.exception))
+        self.assertIn("invalid_grant", str(e.exception))
+        self.assertIn("AADSTS70008", str(e.exception))
+
+    def test_refresh_access_token_non_200_non_json_body(self):
+        """Test _refresh_access_token still raises a clear error when the
+        token endpoint's error response body isn't valid JSON."""
+        mock_response = MockResponse(500)
+        mock_response.json = Mock(side_effect=ValueError("not json"))
+        with patch.object(self.client._session, "post", return_value=mock_response):
+            with self.assertRaises(MSDynamics365CrmAuthenticationError) as e:
+                self.client._refresh_access_token()
+
+        self.assertIn("500", str(e.exception))
 
     def test_get_access_token_uses_authorization_code_refresh_by_default(self):
         """Test get_access_token falls back to the refresh-token flow for authorization_code auth"""

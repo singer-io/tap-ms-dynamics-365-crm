@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.0
+  * Discovery now attempts every entity from `EntityDefinitions`/`$metadata` instead of a static `INCLUDED_ENTITIES` allow-list. [#11](https://github.com/singer-io/tap-ms-dynamics-365-crm/pull/11)
+
 ## 1.0.1
   * Added `msdynmkt_eventmetadata`, `msdynmkt_eventparametermetadata`, `powerbidatasetapdx`, and `ribbonmetadatatoprocess` to `INCLUDED_ENTITIES`. [#10](https://github.com/singer-io/tap-ms-dynamics-365-crm/pull/10)
 

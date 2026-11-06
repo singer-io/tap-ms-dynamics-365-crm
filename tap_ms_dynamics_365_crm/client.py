@@ -19,8 +19,8 @@ from singer import get_logger, metrics
 from tap_ms_dynamics_365_crm.exceptions import (
     ERROR_CODE_EXCEPTION_MAPPING,
     MSDynamics365CrmError,
+    MSDynamics365CrmAuthenticationError,
     MSDynamics365CrmRateLimitError,
-    MSDynamics365CrmUnprocessableEntityError,
     MSDynamics365CrmInternalServerError,
     MSDynamics365CrmNotImplementedError,
     MSDynamics365CrmBadGatewayError,
@@ -252,7 +252,20 @@ class Client:
         )
 
         if response.status_code != 200:
-            raise MSDynamics365CrmError('Non-200 response fetching Dynamics access token')
+            try:
+                error_body = response.json()
+                error = error_body.get('error')
+                error_description = error_body.get('error_description')
+                correlation_id = error_body.get('correlation_id')
+            except (ValueError, AttributeError):
+                error = error_description = correlation_id = None
+            message = (
+                "Failed to refresh access token using refresh_token flow. "
+                f"HTTP-status-code: {response.status_code}, error={error}, "
+                f"description={error_description}, correlation_id={correlation_id}"
+            )
+            LOGGER.error(message)
+            raise MSDynamics365CrmAuthenticationError(message, response)
 
         data = response.json()
 
@@ -286,10 +299,12 @@ class Client:
             error = result.get("error")
             error_description = result.get("error_description")
             correlation_id = result.get("correlation_id")
-            raise MSDynamics365CrmError(
+            message = (
                 "Failed to acquire access token using client_credentials. "
                 f"error={error}, description={error_description}, correlation_id={correlation_id}"
             )
+            LOGGER.error(message)
+            raise MSDynamics365CrmAuthenticationError(message)
 
         self._access_token = result["access_token"]
         expires_in_seconds = result.get("expires_in", DEFAULT_EXPIRY_TIME_IN_SECONDS)
@@ -371,7 +386,6 @@ class Client:
             RequestsConnectionError,
             ChunkedEncodingError,
             Timeout,
-            MSDynamics365CrmUnprocessableEntityError,
             MSDynamics365CrmInternalServerError,
             MSDynamics365CrmNotImplementedError,
             MSDynamics365CrmBadGatewayError,
