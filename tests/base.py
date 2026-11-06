@@ -11921,17 +11921,6 @@ EXPECTED_METADATA_RAW = json.loads('''
         "obeys_start_date": true,
         "api_limit": 100
     },
-    "componentversionnrddatasource": {
-        "primary_keys": [
-            "componentversionnrddatasourceid"
-        ],
-        "replication_method": "INCREMENTAL",
-        "replication_keys": [
-            "modifiedon"
-        ],
-        "obeys_start_date": true,
-        "api_limit": 100
-    },
     "delegatedauthorization": {
         "primary_keys": [
             "delegatedauthorizationid"
@@ -19577,7 +19566,14 @@ class MSDynamics365CRMBaseTest(BaseCase):
     # standard expected metadata. These are always excluded from discovery
     # test comparisons so the test suite doesn't break when the sandbox's
     # custom entities change.
+    # "componentversionnrddatasource" is an elastic table that the sandbox
+    # intermittently rejects with HTTP 400 0x80097259 ("elastic child unowned
+    # table ... without parent record value"). The failures come in bursts
+    # lasting longer than the tap's access-check retries, so the stream's
+    # presence in the catalog is not deterministic. It is excluded from the
+    # comparison regardless of whether discovery returns it.
     CUSTOM_STREAMS_TO_SKIP = {
+        "componentversionnrddatasource",
         "new_testcustomactivity",
         "new_testelastic",
         "new_testequipmentlog",
