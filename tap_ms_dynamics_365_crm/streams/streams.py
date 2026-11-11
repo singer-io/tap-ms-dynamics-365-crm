@@ -13,6 +13,13 @@ from tap_ms_dynamics_365_crm.exceptions import MSDynamics365CrmForbiddenError
 
 LOGGER = singer.get_logger()
 
+# Virtual entities originating from Dynamics 365 Finance & Operations (ERP)
+# use the managed prefix 'mserp_'. Probing these tables without F&O service-to-service
+# permissions results in HTTP 401 Unauthorized errors during discovery.
+IGNORED_ENTITY_PREFIXES = (
+    'mserp_',
+)
+
 STRING_TYPES = set([
     'Edm.String',
     'Edm.Guid',
@@ -63,7 +70,9 @@ def _request_metadata(client: Client, path: str, **kwargs):
 
 
 def call_entity_definitions(client: Client):
-    """Calls the `EntityDefinitions` endpoint to get all entities."""
+    """Calls the `EntityDefinitions` endpoint to get all entities, excluding
+    Dynamics 365 Finance and Operations (mserp_) virtual entities.
+    """
     params = {
         "$select": (
             "MetadataId,LogicalName,EntitySetName,IsIntersect,"
@@ -80,7 +89,12 @@ def call_entity_definitions(client: Client):
 
     LOGGER.info('MS Dynamics returned total {} entities'.format(results.get("@odata.count")))
 
-    yield from results.get('value', [])
+    for entity in results.get('value', []):
+        logical_name = entity.get('LogicalName') or ''
+        if logical_name.lower().startswith(IGNORED_ENTITY_PREFIXES):
+            LOGGER.debug("Skipping Finance & Operations virtual entity: %s", logical_name)
+            continue
+        yield entity
 
 def build_entity_metadata(client: Client):
     """Builds entity metadata from the `$metadata` endpoints.
