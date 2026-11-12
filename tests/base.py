@@ -19546,6 +19546,81 @@ EXPECTED_METADATA_RAW = json.loads('''
         ],
         "obeys_start_date": true,
         "api_limit": 100
+    },
+    "msdyn_chatgptengagementctx": {
+        "primary_keys": [
+            "msdyn_chatgptengagementctxid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_externalevaluationconversation": {
+        "primary_keys": [
+            "msdyn_externalevaluationconversationid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_m365copilotengagementctx": {
+        "primary_keys": [
+            "msdyn_m365copilotengagementctxid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_ocm365copilotchannelconfig": {
+        "primary_keys": [
+            "msdyn_ocm365copilotchannelconfigid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "sensitivitylabel": {
+        "primary_keys": [
+            "sensitivitylabelid"
+        ],
+        "replication_method": "FULL_TABLE",
+        "replication_keys": [],
+        "obeys_start_date": false,
+        "api_limit": 100
+    },
+    "msdyn_occhatgptchannelconfig": {
+        "primary_keys": [
+            "msdyn_occhatgptchannelconfigid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
+    },
+    "msdyn_agentqueueavailabilityhistory": {
+        "primary_keys": [
+            "msdyn_agentqueueavailabilityhistoryid"
+        ],
+        "replication_method": "INCREMENTAL",
+        "replication_keys": [
+            "modifiedon"
+        ],
+        "obeys_start_date": true,
+        "api_limit": 100
     }
 }
 ''')
