@@ -6,6 +6,7 @@ from tap_ms_dynamics_365_crm.streams.streams import (
     call_entity_definitions,
     build_entity_metadata,
     build_schema,
+    IGNORED_ENTITY_PREFIXES,
 )
 from tap_ms_dynamics_365_crm.streams.abstracts import BaseStream
 from tap_ms_dynamics_365_crm.client import (
@@ -90,6 +91,69 @@ class TestGetStreamsAccessFiltering(unittest.TestCase):
         self.assertNotIn('aaduser', streams)
         self.assertIn('account', streams)
         self.assertEqual(mock_check_access.call_count, 2)
+
+    @patch.object(BaseStream, 'check_access', autospec=True)
+    @patch('tap_ms_dynamics_365_crm.streams.streams.transform_metadata_xml')
+    @patch('tap_ms_dynamics_365_crm.streams.streams.flatten_entity_attributes')
+    def test_mserp_virtual_entities_are_never_probed_during_discovery(
+        self, mock_flatten, mock_transform_metadata_xml, mock_check_access
+    ):
+        """F&O / mserp_ tables must be filtered out before any check_access() table
+
+        probe occurs, preventing 401 unauthorized errors during discovery.
+        """
+        client = MagicMock()
+        client.max_pagesize = 5000
+        client.config = {}
+        client.auth_method = AUTH_METHOD_AUTHORIZATION_CODE
+
+        def mock_make_request(method, path, **kwargs):
+            if path == 'EntityDefinitions':
+                return {
+                    "@odata.count": 2,
+                    "value": [
+                        {
+                            "LogicalName": "mserp_custcustomerv3entity",
+                            "EntitySetName": "mserp_custcustomerv3entities",
+                            "IsIntersect": False,
+                            "PrimaryIdAttribute": "mserp_custcustomerv3entityid",
+                        },
+                        {
+                            "LogicalName": "account",
+                            "EntitySetName": "accounts",
+                            "IsIntersect": False,
+                            "PrimaryIdAttribute": "accountid",
+                        },
+                    ],
+                }
+            if path == '$metadata':
+                return "<xml />"
+            return {}
+
+        client.make_request.side_effect = mock_make_request
+        mock_transform_metadata_xml.return_value = {
+            "account": {
+                "LogicalName": "account",
+                "EntitySetName": "accounts",
+                "Key": "accountid",
+                "Properties": {},
+            },
+            "mserp_custcustomerv3entity": {
+                "LogicalName": "mserp_custcustomerv3entity",
+                "EntitySetName": "mserp_custcustomerv3entities",
+                "Key": "mserp_custcustomerv3entityid",
+                "Properties": {},
+            },
+        }
+        mock_flatten.return_value = {'modifiedon': {'type': 'Edm.DateTimeOffset'}}
+        mock_check_access.return_value = True
+
+        streams = get_streams(client, create_schema=True)
+
+        self.assertIn("account", streams)
+        self.assertNotIn("mserp_custcustomerv3entity", streams)
+        # check_access should only be called once for 'account', NEVER for 'mserp_*'
+        self.assertEqual(mock_check_access.call_count, 1)
 
     @patch.object(BaseStream, 'check_access', autospec=True)
     @patch('tap_ms_dynamics_365_crm.streams.streams.build_entity_metadata')
@@ -270,6 +334,45 @@ class TestCallEntityDefinitions(unittest.TestCase):
             },
             path='EntityDefinitions',
         )
+
+    def test_filters_mserp_fno_virtual_entities(self):
+        """Entities prefixed with mserp_ (case-insensitive) are skipped and logged at DEBUG."""
+        client = MagicMock()
+        client.make_request.return_value = {
+            "@odata.count": 4,
+            "value": [
+                {"LogicalName": "account"},
+                {"LogicalName": "mserp_custcustomerv3entity"},
+                {"LogicalName": "MSERP_salesorderheaderv2entity"},
+                {"LogicalName": "contact"},
+            ],
+        }
+
+        with patch('tap_ms_dynamics_365_crm.streams.streams.LOGGER.debug') as mock_debug:
+            entities = list(call_entity_definitions(client))
+
+        logical_names = [e.get("LogicalName") for e in entities]
+        self.assertEqual(logical_names, ["account", "contact"])
+        self.assertEqual(mock_debug.call_count, 2)
+        mock_debug.assert_any_call(
+            "Skipping Finance & Operations virtual entity: %s",
+            "mserp_custcustomerv3entity",
+        )
+        mock_debug.assert_any_call(
+            "Skipping Finance & Operations virtual entity: %s",
+            "MSERP_salesorderheaderv2entity",
+        )
+
+    def test_handles_entities_with_missing_or_none_logical_name(self):
+        """Entities missing LogicalName or having None do not raise an AttributeError."""
+        client = MagicMock()
+        client.make_request.return_value = {
+            "@odata.count": 2,
+            "value": [{"LogicalName": None}, {}],
+        }
+
+        entities = list(call_entity_definitions(client))
+        self.assertEqual(len(entities), 2)
 
 
 class TestBuildEntityMetadata(unittest.TestCase):

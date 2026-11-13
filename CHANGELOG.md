@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.1
+  * Virtual entities prefixed with `mserp_` are now excluded prior to table probing. [#12](https://github.com/singer-io/tap-ms-dynamics-365-crm/pull/12)
+
 ## 1.1.0
   * Discovery now attempts every entity from `EntityDefinitions`/`$metadata` instead of a static `INCLUDED_ENTITIES` allow-list. [#11](https://github.com/singer-io/tap-ms-dynamics-365-crm/pull/11)
 
