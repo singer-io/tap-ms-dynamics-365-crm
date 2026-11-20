@@ -12,6 +12,7 @@ from singer import (
     metadata
 )
 from tap_ms_dynamics_365_crm.client import Client, MAX_PAGESIZE
+from tap_ms_dynamics_365_crm.field_naming import normalize_field_name
 from tap_ms_dynamics_365_crm.exceptions import (
     MSDynamics365CrmError,
     MSDynamics365CrmAuthenticationError,
@@ -22,6 +23,21 @@ from tap_ms_dynamics_365_crm.exceptions import (
 )
 
 LOGGER = get_logger()
+
+# Requesting annotations surfaces the Dataverse-computed properties
+# (formatted display values, and for lookups the referenced entity's
+# logical name/navigation property) that build_schema() synthesizes for
+# attributes with an annotation-bearing AttributeType. See
+# streams.py:FORMATTED_VALUE_ATTRIBUTE_TYPES/LOOKUP_ATTRIBUTE_TYPES.
+ANNOTATIONS_PREFER = 'odata.include-annotations="*"'
+
+# Dataverse error code for "SandboxMessageSizeExceeded": the requested page
+# of (now annotation-enlarged) records exceeded the sandboxed plug-in
+# response size limit. Halving the page size and retrying, down to a floor
+# of MIN_PAGESIZE, lets large-row entities (e.g. annotation/email) still
+# sync instead of failing outright.
+SANDBOX_MESSAGE_SIZE_EXCEEDED_CODE = '0x8004029b'
+MIN_PAGESIZE = 1
 
 
 class BaseStream(ABC):
@@ -99,13 +115,46 @@ class BaseStream(ABC):
         """
 
 
+    def build_prefer_header(self) -> str:
+        """Builds the `Prefer` header value for a records request: requests
+        annotations (needed for the display-value/lookup-name properties
+        build_schema() adds to the schema) alongside the current page size.
+        """
+        return f'{ANNOTATIONS_PREFER},odata.maxpagesize={self.page_size}'
+
+    def _request_with_pagesize_halving(self, endpoint: str) -> Dict:
+        """Performs a single records request, halving `page_size` and
+        retrying in place (same endpoint/params) if Dataverse rejects the
+        page for exceeding the sandboxed response size limit.
+        """
+        while True:
+            try:
+                return self.client.make_request(
+                    self.http_method, endpoint, headers=self.headers, params=self.params
+                )
+            except MSDynamics365CrmBadRequestError as exc:
+                if (
+                    SANDBOX_MESSAGE_SIZE_EXCEEDED_CODE not in str(exc).lower()
+                    or self.page_size <= MIN_PAGESIZE
+                ):
+                    raise
+                self.page_size = max(self.page_size // 2, MIN_PAGESIZE)
+                LOGGER.warning(
+                    "Stream: %s hit SandboxMessageSizeExceeded (%s); "
+                    "halving page size to %d and retrying.",
+                    self.tap_stream_id,
+                    SANDBOX_MESSAGE_SIZE_EXCEEDED_CODE,
+                    self.page_size,
+                )
+                self.update_header(Prefer=self.build_prefer_header())
+
     def get_records(self) -> Iterator:
         """Interacts with api client interaction and pagination."""
         next_page = True
         endpoint = self.url_endpoint
 
         while next_page:
-            response = self.client.make_request(self.http_method, endpoint, headers=self.headers, params=self.params)
+            response = self._request_with_pagesize_halving(endpoint)
 
             if '@odata.nextLink' in response:
                 endpoint = response.get('@odata.nextLink')
@@ -113,7 +162,12 @@ class BaseStream(ABC):
             else:
                 next_page = False
 
-            yield from response.get(self.data_key, [])
+            # Normalizing keys here (once, for every stream type) keeps raw
+            # API record keys in lockstep with the normalized schema property
+            # names streams.py:build_schema()/build_annotation_properties()
+            # generate.
+            for record in response.get(self.data_key, []):
+                yield {normalize_field_name(key): value for key, value in record.items()}
 
     def write_schema(self) -> None:
         """
@@ -354,7 +408,7 @@ class IncrementalStream(BaseStream):
             filter_value=bookmark_date,
             secondary_orderby_key=secondary_orderby_key
         )
-        self.update_header(Prefer=f'odata.maxpagesize={self.page_size}')
+        self.update_header(Prefer=self.build_prefer_header())
         self.url_endpoint = self.get_url_endpoint(parent_obj)
 
         with metrics.record_counter(self.tap_stream_id) as counter:
@@ -394,7 +448,7 @@ class FullTableStream(BaseStream):
     ) -> Dict:
         """Abstract implementation for `type: Fulltable` stream."""
         self.url_endpoint = self.get_url_endpoint(parent_obj)
-        self.update_header(Prefer=f'odata.maxpagesize={self.page_size}')
+        self.update_header(Prefer=self.build_prefer_header())
 
         with metrics.record_counter(self.tap_stream_id) as counter:
             for record in self.get_records():
