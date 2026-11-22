@@ -79,6 +79,18 @@ FORMATTED_VALUE_ATTRIBUTE_TYPES = LOOKUP_ATTRIBUTE_TYPES | frozenset([
     'Picklist', 'State', 'Status', 'MultiSelectPicklist', 'Money', 'DateTime', 'Boolean',
 ])
 
+# Dataverse's older `AttributeType` enum reports some column kinds as the
+# generic 'Virtual' value instead of their real semantic type; the actual
+# type is only available via the newer `AttributeTypeName.Value` property
+# (e.g. 'MultiSelectPicklistType'). See
+# https://learn.microsoft.com/en-us/power-apps/developer/data-platform/entity-attribute-metadata
+# ("Don't be confused by the AttributeType property... Refer to the
+# AttributeTypeName property rather than the AttributeType property.").
+# Multi-select choice columns are the only 'Virtual'-reported type in
+# FORMATTED_VALUE_ATTRIBUTE_TYPES, so only that one needs resolving here.
+VIRTUAL_ATTRIBUTE_TYPE = 'Virtual'
+MULTISELECT_PICKLIST_ATTRIBUTE_TYPE_NAME = 'MultiSelectPicklistType'
+
 REPLICATION_TO_STREAM_MAP = {
     'INCREMENTAL': IncrementalStream,
     'FULL_TABLE': FullTableStream
@@ -114,8 +126,11 @@ def call_entity_definitions(client: Client):
         # build_entity_metadata() learn each attribute's semantic
         # AttributeType (e.g. 'Picklist', 'Lookup') in addition to the
         # generic Edm.* type $metadata provides, without an extra
-        # per-entity round trip.
-        "$expand": "Attributes($select=LogicalName,AttributeType)",
+        # per-entity round trip. AttributeTypeName is also requested since
+        # AttributeType alone reports some types (e.g. multi-select choice
+        # columns) only as the generic 'Virtual' value -- see
+        # VIRTUAL_ATTRIBUTE_TYPE above.
+        "$expand": "Attributes($select=LogicalName,AttributeType,AttributeTypeName)",
         "$count": "true",
     }
 
@@ -133,6 +148,18 @@ def call_entity_definitions(client: Client):
             LOGGER.debug("Skipping Finance & Operations virtual entity: %s", logical_name)
             continue
         yield entity
+
+def _resolve_attribute_type(attr: dict) -> str:
+    """Resolves an attribute's real semantic type, correcting for Dataverse
+    reporting some types (e.g. multi-select choice columns) as the generic
+    'Virtual' `AttributeType` value. See VIRTUAL_ATTRIBUTE_TYPE above.
+    """
+    attribute_type = attr.get("AttributeType")
+    if attribute_type == VIRTUAL_ATTRIBUTE_TYPE:
+        type_name = (attr.get("AttributeTypeName") or {}).get("Value")
+        if type_name == MULTISELECT_PICKLIST_ATTRIBUTE_TYPE_NAME:
+            return "MultiSelectPicklist"
+    return attribute_type
 
 def build_entity_metadata(client: Client):
     """Builds entity metadata from the `$metadata` endpoints.
@@ -169,7 +196,7 @@ def build_entity_metadata(client: Client):
             entity.get("PrimaryIdAttribute") or entity_metadata[entity_name].get("Key")
         )
         entity_metadata[entity_name]["AttributeTypes"] = {
-            attr.get("LogicalName"): attr.get("AttributeType")
+            attr.get("LogicalName"): _resolve_attribute_type(attr)
             for attr in entity.get("Attributes") or []
             if attr.get("LogicalName")
         }

@@ -332,7 +332,7 @@ class TestCallEntityDefinitions(unittest.TestCase):
                     "MetadataId,LogicalName,EntitySetName,IsIntersect,"
                     "PrimaryIdAttribute"
                 ),
-                "$expand": "Attributes($select=LogicalName,AttributeType)",
+                "$expand": "Attributes($select=LogicalName,AttributeType,AttributeTypeName)",
                 "$count": "true",
             },
             path='EntityDefinitions',
@@ -514,6 +514,53 @@ class TestBuildEntityMetadata(unittest.TestCase):
         self.assertEqual(results[0]["AttributeTypes"], {
             "new_priority": "Picklist",
             "parentaccountid": "Lookup",
+        })
+
+    @patch('tap_ms_dynamics_365_crm.streams.streams.transform_metadata_xml')
+    @patch('tap_ms_dynamics_365_crm.streams.streams.call_entity_definitions')
+    def test_resolves_multiselect_picklist_reported_as_virtual_attribute_type(
+        self, mock_call_entity_definitions, mock_transform_metadata_xml
+    ):
+        """Dataverse reports multi-select choice columns with
+        `AttributeType: "Virtual"` rather than `"MultiSelectPicklist"` (see
+        https://learn.microsoft.com/en-us/power-apps/developer/data-platform/entity-attribute-metadata).
+        build_entity_metadata() must resolve the real type via
+        `AttributeTypeName.Value` so these columns still match
+        FORMATTED_VALUE_ATTRIBUTE_TYPES and get their formatted-value
+        annotation during discovery, using the actual nested shape Dataverse
+        returns for AttributeTypeName."""
+        mock_call_entity_definitions.return_value = [
+            {
+                "LogicalName": "account", "EntitySetName": "accounts",
+                "Attributes": [
+                    {
+                        "LogicalName": "preferredcontactmethods",
+                        "AttributeType": "Virtual",
+                        "AttributeTypeName": {"Value": "MultiSelectPicklistType"},
+                    },
+                    {
+                        "LogicalName": "entityimage",
+                        "AttributeType": "Virtual",
+                        "AttributeTypeName": {"Value": "ImageType"},
+                    },
+                    {
+                        "LogicalName": "new_priority",
+                        "AttributeType": "Picklist",
+                        "AttributeTypeName": {"Value": "PicklistType"},
+                    },
+                ],
+            },
+        ]
+        mock_transform_metadata_xml.return_value = {"account": {"Key": "accountid"}}
+
+        client = MagicMock()
+
+        results = list(build_entity_metadata(client))
+
+        self.assertEqual(results[0]["AttributeTypes"], {
+            "preferredcontactmethods": "MultiSelectPicklist",
+            "entityimage": "Virtual",
+            "new_priority": "Picklist",
         })
 
     @patch('tap_ms_dynamics_365_crm.streams.streams.transform_metadata_xml')

@@ -519,6 +519,33 @@ class TestBaseStreamPagination(unittest.TestCase):
 
         self.assertEqual(stream.page_size, 1)
 
+    def test_get_records_reraises_sandbox_error_on_continuation_request(self):
+        """A SandboxMessageSizeExceeded error raised on a request that
+        followed an @odata.nextLink must be re-raised, not retried with a
+        halved page size: Dataverse requires the original page size to be
+        retained for the lifetime of the paged query."""
+        mock_client = MagicMock()
+        mock_client.max_pagesize = 5000
+        sandbox_error = MSDynamics365CrmBadRequestError(
+            "HTTP-error-code: 400, Error Code: 0x8004029b, "
+            "Error: SandboxMessageSizeExceeded"
+        )
+        first_page_response = {
+            'value': [{'id': '1'}],
+            '@odata.nextLink': 'https://api.example.com/data?$skiptoken=abc123'
+        }
+        mock_client.make_request.side_effect = [first_page_response, sandbox_error]
+
+        stream = ConcreteStream(client=mock_client)
+        stream.url_endpoint = 'https://api.example.com/data'
+        stream.page_size = 100
+
+        with self.assertRaises(MSDynamics365CrmBadRequestError):
+            list(stream.get_records())
+
+        self.assertEqual(stream.page_size, 100)
+        self.assertEqual(mock_client.make_request.call_count, 2)
+
     def test_get_records_reraises_unrelated_bad_request_errors(self):
         """Bad request errors that aren't SandboxMessageSizeExceeded are
         never retried/halved; they propagate immediately."""

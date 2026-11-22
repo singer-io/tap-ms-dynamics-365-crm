@@ -4698,6 +4698,15 @@
     "obeys_start_date": false,
     "api_limit": 100
   },
+  "msdyn_appconfiguration_experienceblueprint": {
+    "primary_keys": [
+      "msdyn_appconfiguration_experienceblueprintid"
+    ],
+    "replication_method": "FULL_TABLE",
+    "replication_keys": [],
+    "obeys_start_date": false,
+    "api_limit": 100
+  },
   "msdyn_appconfiguration_sessiontemplate": {
     "primary_keys": [
       "msdyn_appconfiguration_sessiontemplateid"
@@ -5048,6 +5057,17 @@
     "obeys_start_date": true,
     "api_limit": 100
   },
+  "msdyn_blueprintcomponent": {
+    "primary_keys": [
+      "msdyn_blueprintcomponentid"
+    ],
+    "replication_method": "INCREMENTAL",
+    "replication_keys": [
+      "modifiedon"
+    ],
+    "obeys_start_date": true,
+    "api_limit": 100
+  },
   "msdyn_bookableresourceassociation": {
     "primary_keys": [
       "msdyn_bookableresourceassociationid"
@@ -5337,6 +5357,17 @@
   "msdyn_cannedmessage": {
     "primary_keys": [
       "msdyn_cannedmessageid"
+    ],
+    "replication_method": "INCREMENTAL",
+    "replication_keys": [
+      "modifiedon"
+    ],
+    "obeys_start_date": true,
+    "api_limit": 100
+  },
+  "msdyn_canvasuserpreference": {
+    "primary_keys": [
+      "msdyn_canvasuserpreferenceid"
     ],
     "replication_method": "INCREMENTAL",
     "replication_keys": [
@@ -8104,6 +8135,17 @@
   "msdyn_evaluationtriggerconfig": {
     "primary_keys": [
       "msdyn_evaluationtriggerconfigid"
+    ],
+    "replication_method": "INCREMENTAL",
+    "replication_keys": [
+      "modifiedon"
+    ],
+    "obeys_start_date": true,
+    "api_limit": 100
+  },
+  "msdyn_experienceblueprint": {
+    "primary_keys": [
+      "msdyn_experienceblueprintid"
     ],
     "replication_method": "INCREMENTAL",
     "replication_keys": [
