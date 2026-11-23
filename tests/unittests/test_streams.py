@@ -659,15 +659,16 @@ class TestBuildSchema(unittest.TestCase):
         """A `_<name>_value` property whose resolved AttributeType is 'Lookup'
         gets the formatted display value plus the two lookup-identification
         annotations Dataverse emits under `odata.include-annotations="*"`.
-        Both the base property and its annotations are normalized (leading
-        `_` stripped, `@...` suffix lowercased/underscored) to match the
-        record keys get_records() normalizes at sync time."""
+        The base property keeps its leading `_` (an existing field that may
+        already be selected); its annotations -- new fields no existing
+        customer could already have selected -- get both the leading `_`
+        stripped and the `@...` suffix lowercased/underscored."""
         schema = build_schema({
             '_parentcustomerid_value': {'type': 'Edm.Guid', 'attribute_type': 'Lookup'}
         })
 
         properties = schema['properties']
-        self.assertIn('parentcustomerid_value', properties)
+        self.assertIn('_parentcustomerid_value', properties)
         self.assertEqual(
             properties['parentcustomerid_value_odata_community_display_v1_formatted_value']['type'],
             ['null', 'string'],
@@ -682,6 +683,7 @@ class TestBuildSchema(unittest.TestCase):
             ]['type'],
             ['null', 'string'],
         )
+
 
     def test_picklist_attribute_type_adds_only_formatted_value_annotation(self):
         """A Picklist (single-select option set) only gets the label

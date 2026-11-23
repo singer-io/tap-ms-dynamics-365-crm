@@ -1,8 +1,8 @@
 # Changelog
 
-## 2.0.0
-  * **Breaking:** lookup and OData annotation field names are now normalized
-    to a lowercase, underscore-separated form with no leading underscore. [#13](https://github.com/singer-io/tap-ms-dynamics-365-crm/pull/13)
+## 1.2.0
+  * OData annotation field name suffixes (`@...`) are now added into schema and
+    normalized to a lowercase, underscore-separated form. [#14](https://github.com/singer-io/tap-ms-dynamics-365-crm/pull/14)
   * `mscrm.BooleanManagedProperty` attributes are no longer omitted from the
     schema.
   * Discovery now only excludes pure `IsIntersect` junction entities (4 or

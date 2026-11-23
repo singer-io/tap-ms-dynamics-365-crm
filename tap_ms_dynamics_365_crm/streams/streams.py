@@ -362,8 +362,10 @@ def build_schema(attributes: dict):
             if json_format:
                 prop_json_schema['format'] = json_format
 
-        # Normalizes away the lookup `_value` leading underscore so the base
-        # property name matches the record keys get_records() normalizes.
+        # Keeps the base property name in lockstep with get_records()'s
+        # normalization (only rewrites an `@...` annotation suffix; plain
+        # attribute names, including the lookup `_value` prefix, pass
+        # through unchanged -- see field_naming.py).
         json_props[normalize_field_name(attr_name)] = prop_json_schema
         json_props.update(
             build_annotation_properties(attr_name, attr_props.get('attribute_type'))

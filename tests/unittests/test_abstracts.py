@@ -406,11 +406,13 @@ class TestBaseStreamPagination(unittest.TestCase):
         records = list(stream.get_records())
         self.assertEqual(len(records), 2)
 
-    def test_get_records_normalizes_lookup_and_annotation_keys(self):
-        """get_records() must normalize raw Dataverse keys (lookup `_value`
-        prefix stripped, `@...` annotation suffixes lowercased/underscored)
-        so they match the normalized schema property names build_schema()
-        generates."""
+    def test_get_records_normalizes_annotation_keys_and_preserves_base_lookup_prefix(self):
+        """get_records() must normalize raw Dataverse `@...` annotation
+        keys (lowercased/underscored suffix, leading `_` stripped, since
+        they're new fields) so they match the normalized schema property
+        names build_schema() generates, while leaving the base lookup
+        `_value` attribute's prefix untouched (an existing field that may
+        already be selected)."""
         mock_client = MagicMock()
         mock_client.max_pagesize = 5000
         response = {
@@ -430,7 +432,7 @@ class TestBaseStreamPagination(unittest.TestCase):
         records = list(stream.get_records())
 
         self.assertEqual(records, [{
-            'ownerid_value': 'guid-1',
+            '_ownerid_value': 'guid-1',
             'ownerid_value_odata_community_display_v1_formatted_value': 'Jane Doe',
             'ownerid_value_microsoft_dynamics_crm_lookuplogicalname': 'systemuser',
             'territorycode': 1,
