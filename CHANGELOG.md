@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.0.0
+## 1.1.2
   * `mscrm.BooleanManagedProperty` attributes are no longer omitted from the
     schema.
   * Discovery now only excludes pure `IsIntersect` junction entities (4 or
