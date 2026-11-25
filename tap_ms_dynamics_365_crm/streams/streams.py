@@ -1,7 +1,6 @@
 import singer
 
 from tap_ms_dynamics_365_crm.client import Client
-from tap_ms_dynamics_365_crm.field_naming import normalize_field_name
 from tap_ms_dynamics_365_crm.xml_transformer import (
     flatten_entity_attributes,
     transform_metadata_xml
@@ -299,20 +298,18 @@ def build_annotation_properties(attr_name: str, attribute_type: str) -> dict:
     if attribute_type not in FORMATTED_VALUE_ATTRIBUTE_TYPES:
         return {}
 
-    # Property names are normalized (see field_naming.py) so they match the
-    # record keys get_records() normalizes at sync time.
     annotations = {
-        normalize_field_name(f'{attr_name}@OData.Community.Display.V1.FormattedValue'): {
+        f'{attr_name}@OData.Community.Display.V1.FormattedValue': {
             'type': ['null', 'string']
         }
     }
 
     if attribute_type in LOOKUP_ATTRIBUTE_TYPES:
         annotations[
-            normalize_field_name(f'{attr_name}@Microsoft.Dynamics.CRM.lookuplogicalname')
+            f'{attr_name}@Microsoft.Dynamics.CRM.lookuplogicalname'
         ] = {'type': ['null', 'string']}
         annotations[
-            normalize_field_name(f'{attr_name}@Microsoft.Dynamics.CRM.associatednavigationproperty')
+            f'{attr_name}@Microsoft.Dynamics.CRM.associatednavigationproperty'
         ] = {'type': ['null', 'string']}
 
     return annotations
@@ -362,9 +359,7 @@ def build_schema(attributes: dict):
             if json_format:
                 prop_json_schema['format'] = json_format
 
-        # Normalizes away the lookup `_value` leading underscore so the base
-        # property name matches the record keys get_records() normalizes.
-        json_props[normalize_field_name(attr_name)] = prop_json_schema
+        json_props[attr_name] = prop_json_schema
         json_props.update(
             build_annotation_properties(attr_name, attr_props.get('attribute_type'))
         )

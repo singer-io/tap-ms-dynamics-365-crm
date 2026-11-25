@@ -406,20 +406,20 @@ class TestBaseStreamPagination(unittest.TestCase):
         records = list(stream.get_records())
         self.assertEqual(len(records), 2)
 
-    def test_get_records_normalizes_lookup_and_annotation_keys(self):
-        """get_records() must normalize raw Dataverse keys (lookup `_value`
-        prefix stripped, `@...` annotation suffixes lowercased/underscored)
-        so they match the normalized schema property names build_schema()
-        generates."""
+    def test_get_records_preserves_lookup_and_annotation_keys(self):
+        """Raw Dataverse keys must match the generated schema."""
         mock_client = MagicMock()
         mock_client.max_pagesize = 5000
         response = {
             'value': [{
                 '_ownerid_value': 'guid-1',
+                'ownerid_value': 'distinct value',
                 '_ownerid_value@OData.Community.Display.V1.FormattedValue': 'Jane Doe',
                 '_ownerid_value@Microsoft.Dynamics.CRM.lookuplogicalname': 'systemuser',
+                '_ownerid_value@Microsoft.Dynamics.CRM.associatednavigationproperty': 'ownerid',
                 'territorycode': 1,
                 'territorycode@OData.Community.Display.V1.FormattedValue': 'Northeast',
+                '_ownerid_value@Unknown.Annotation': 'unrecognized',
             }]
         }
         mock_client.make_request.return_value = response
@@ -429,13 +429,7 @@ class TestBaseStreamPagination(unittest.TestCase):
 
         records = list(stream.get_records())
 
-        self.assertEqual(records, [{
-            'ownerid_value': 'guid-1',
-            'ownerid_value_odata_community_display_v1_formatted_value': 'Jane Doe',
-            'ownerid_value_microsoft_dynamics_crm_lookuplogicalname': 'systemuser',
-            'territorycode': 1,
-            'territorycode_odata_community_display_v1_formatted_value': 'Northeast',
-        }])
+        self.assertEqual(records, response['value'])
 
     def test_get_records_missing_data_key(self):
         """Test get_records when data_key is missing from response"""

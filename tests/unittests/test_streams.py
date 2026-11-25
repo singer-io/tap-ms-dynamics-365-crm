@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from singer import Transformer
+from singer import Transformer, metadata
 
 from tap_ms_dynamics_365_crm.streams.streams import (
     get_streams,
@@ -659,26 +659,24 @@ class TestBuildSchema(unittest.TestCase):
         """A `_<name>_value` property whose resolved AttributeType is 'Lookup'
         gets the formatted display value plus the two lookup-identification
         annotations Dataverse emits under `odata.include-annotations="*"`.
-        Both the base property and its annotations are normalized (leading
-        `_` stripped, `@...` suffix lowercased/underscored) to match the
-        record keys get_records() normalizes at sync time."""
+        Both the base property and its annotations retain their raw names."""
         schema = build_schema({
             '_parentcustomerid_value': {'type': 'Edm.Guid', 'attribute_type': 'Lookup'}
         })
 
         properties = schema['properties']
-        self.assertIn('parentcustomerid_value', properties)
+        self.assertIn('_parentcustomerid_value', properties)
         self.assertEqual(
-            properties['parentcustomerid_value_odata_community_display_v1_formatted_value']['type'],
+            properties['_parentcustomerid_value@OData.Community.Display.V1.FormattedValue']['type'],
             ['null', 'string'],
         )
         self.assertEqual(
-            properties['parentcustomerid_value_microsoft_dynamics_crm_lookuplogicalname']['type'],
+            properties['_parentcustomerid_value@Microsoft.Dynamics.CRM.lookuplogicalname']['type'],
             ['null', 'string'],
         )
         self.assertEqual(
             properties[
-                'parentcustomerid_value_microsoft_dynamics_crm_associatednavigationproperty'
+                '_parentcustomerid_value@Microsoft.Dynamics.CRM.associatednavigationproperty'
             ]['type'],
             ['null', 'string'],
         )
@@ -691,10 +689,10 @@ class TestBuildSchema(unittest.TestCase):
         })
 
         properties = schema['properties']
-        self.assertIn('new_priority_odata_community_display_v1_formatted_value', properties)
-        self.assertNotIn('new_priority_microsoft_dynamics_crm_lookuplogicalname', properties)
+        self.assertIn('new_priority@OData.Community.Display.V1.FormattedValue', properties)
+        self.assertNotIn('new_priority@Microsoft.Dynamics.CRM.lookuplogicalname', properties)
         self.assertNotIn(
-            'new_priority_microsoft_dynamics_crm_associatednavigationproperty', properties
+            'new_priority@Microsoft.Dynamics.CRM.associatednavigationproperty', properties
         )
 
     def test_attribute_without_annotation_bearing_type_adds_no_annotations(self):
@@ -746,8 +744,36 @@ class TestBuildSchema(unittest.TestCase):
         })
 
         self.assertIn(
-            'isdisabled_odata_community_display_v1_formatted_value', schema['properties']
+            'isdisabled@OData.Community.Display.V1.FormattedValue', schema['properties']
         )
+
+    def test_leading_underscore_and_unprefixed_fields_remain_distinct(self):
+        schema = build_schema({
+            '_ownerid_value': {'type': 'Edm.Guid'},
+            'ownerid_value': {'type': 'Edm.String'},
+        })
+
+        self.assertEqual(set(schema['properties']), {'_ownerid_value', 'ownerid_value'})
+
+    def test_selected_raw_lookup_fields_survive_singer_transform(self):
+        schema = build_schema({
+            '_ownerid_value': {'type': 'Edm.Guid', 'attribute_type': 'Lookup'},
+        })
+        record = {
+            '_ownerid_value': 'guid-1',
+            '_ownerid_value@OData.Community.Display.V1.FormattedValue': 'Jane Doe',
+            '_ownerid_value@Microsoft.Dynamics.CRM.lookuplogicalname': 'systemuser',
+            '_ownerid_value@Microsoft.Dynamics.CRM.associatednavigationproperty': 'ownerid',
+        }
+        mdata = metadata.to_map(metadata.get_standard_metadata(
+            schema=schema, key_properties=[], valid_replication_keys=[],
+            replication_method='FULL_TABLE',
+        ))
+        for field in record:
+            mdata = metadata.write(mdata, ('properties', field), 'selected', True)
+
+        with Transformer() as transformer:
+            self.assertEqual(transformer.transform(record, schema, mdata), record)
 
     def test_managed_property_schema_validates_and_coerces_via_singer_transform(self):
         """Confirms the generated strict schema actually behaves as

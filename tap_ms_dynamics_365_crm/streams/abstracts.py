@@ -12,7 +12,6 @@ from singer import (
     metadata
 )
 from tap_ms_dynamics_365_crm.client import Client, MAX_PAGESIZE
-from tap_ms_dynamics_365_crm.field_naming import normalize_field_name
 from tap_ms_dynamics_365_crm.exceptions import (
     MSDynamics365CrmError,
     MSDynamics365CrmAuthenticationError,
@@ -185,12 +184,7 @@ class BaseStream(ABC):
             else:
                 next_page = False
 
-            # Normalizing keys here (once, for every stream type) keeps raw
-            # API record keys in lockstep with the normalized schema property
-            # names streams.py:build_schema()/build_annotation_properties()
-            # generate.
-            for record in response.get(self.data_key, []):
-                yield {normalize_field_name(key): value for key, value in record.items()}
+            yield from response.get(self.data_key, [])
 
     def write_schema(self) -> None:
         """
