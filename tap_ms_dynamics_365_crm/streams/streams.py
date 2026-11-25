@@ -20,6 +20,12 @@ IGNORED_ENTITY_PREFIXES = (
     'mserp_',
 )
 
+# Per Microsoft's own Dataverse table-reference criteria, a pure N:N
+# junction entity (not useful on its own) has at most this many columns --
+# just the two relationship ends plus the intersect PK and maybe a name.
+# See build_entity_metadata().
+PURE_JUNCTION_MAX_ATTRIBUTES = 4
+
 STRING_TYPES = set([
     'Edm.String',
     'Edm.Guid',
@@ -42,10 +48,47 @@ DATE_TYPES = set([
 
 BOOL_TYPES = set(['Edm.Boolean'])
 
-COMPLEX_TYPES = set([
+# Edm.Binary backs large blobs (e.g. entityimage, document bodies) that
+# aren't useful synced as base64 strings, so attributes of this type are
+# omitted from the schema entirely (see build_schema()).
+IGNORED_TYPES = set([
     'Edm.Binary',
+])
+
+# Dataverse declares `mscrm.BooleanManagedProperty` as a fixed OData
+# complex type with exactly these three sub-properties (see
+# learn.microsoft.com/en-us/power-apps/developer/data-platform/webapi/
+# reference/booleanmanagedproperty), so build_schema() maps it to a
+# strictly-typed nested object instead of a flat scalar.
+MANAGED_PROPERTY_TYPES = set([
     'mscrm.BooleanManagedProperty',
 ])
+
+# Dataverse `AttributeType` values (from `EntityDefinitions(...)/Attributes`)
+# for which the Web API emits an `@OData.Community.Display.V1.FormattedValue`
+# annotation when a request sends `Prefer: odata.include-annotations="*"`.
+# These annotations never appear in `$metadata` CSDL (they're response-time
+# decorations, not declared data-model properties), so they must be
+# synthesized from each attribute's semantic type rather than discovered.
+LOOKUP_ATTRIBUTE_TYPES = frozenset([
+    'Lookup', 'Customer', 'Owner', 'PartyList',
+])
+
+FORMATTED_VALUE_ATTRIBUTE_TYPES = LOOKUP_ATTRIBUTE_TYPES | frozenset([
+    'Picklist', 'State', 'Status', 'MultiSelectPicklist', 'Money', 'DateTime', 'Boolean',
+])
+
+# Dataverse's older `AttributeType` enum reports some column kinds as the
+# generic 'Virtual' value instead of their real semantic type; the actual
+# type is only available via the newer `AttributeTypeName.Value` property
+# (e.g. 'MultiSelectPicklistType'). See
+# https://learn.microsoft.com/en-us/power-apps/developer/data-platform/entity-attribute-metadata
+# ("Don't be confused by the AttributeType property... Refer to the
+# AttributeTypeName property rather than the AttributeType property.").
+# Multi-select choice columns are the only 'Virtual'-reported type in
+# FORMATTED_VALUE_ATTRIBUTE_TYPES, so only that one needs resolving here.
+VIRTUAL_ATTRIBUTE_TYPE = 'Virtual'
+MULTISELECT_PICKLIST_ATTRIBUTE_TYPE_NAME = 'MultiSelectPicklistType'
 
 REPLICATION_TO_STREAM_MAP = {
     'INCREMENTAL': IncrementalStream,
@@ -78,6 +121,15 @@ def call_entity_definitions(client: Client):
             "MetadataId,LogicalName,EntitySetName,IsIntersect,"
             "PrimaryIdAttribute"
         ),
+        # Expanding Attributes here (one request for every entity) lets
+        # build_entity_metadata() learn each attribute's semantic
+        # AttributeType (e.g. 'Picklist', 'Lookup') in addition to the
+        # generic Edm.* type $metadata provides, without an extra
+        # per-entity round trip. AttributeTypeName is also requested since
+        # AttributeType alone reports some types (e.g. multi-select choice
+        # columns) only as the generic 'Virtual' value -- see
+        # VIRTUAL_ATTRIBUTE_TYPE above.
+        "$expand": "Attributes($select=LogicalName,AttributeType,AttributeTypeName)",
         "$count": "true",
     }
 
@@ -96,13 +148,32 @@ def call_entity_definitions(client: Client):
             continue
         yield entity
 
+def _resolve_attribute_type(attr: dict) -> str:
+    """Resolves an attribute's real semantic type, correcting for Dataverse
+    reporting some types (e.g. multi-select choice columns) as the generic
+    'Virtual' `AttributeType` value. See VIRTUAL_ATTRIBUTE_TYPE above.
+    """
+    attribute_type = attr.get("AttributeType")
+    if attribute_type == VIRTUAL_ATTRIBUTE_TYPE:
+        type_name = (attr.get("AttributeTypeName") or {}).get("Value")
+        if type_name == MULTISELECT_PICKLIST_ATTRIBUTE_TYPE_NAME:
+            return "MultiSelectPicklist"
+    return attribute_type
+
 def build_entity_metadata(client: Client):
     """Builds entity metadata from the `$metadata` endpoints.
 
     Every entity returned by `EntityDefinitions` and present in `$metadata` is
-    yielded, except N:N relationship/junction entities (`IsIntersect`), which
-    are not real queryable business entities. Actual read access for the
-    remaining entities is verified later via `BaseStream.check_access()`.
+    yielded, except pure N:N junction entities: Microsoft's own criteria for
+    a "useful" intersect entity
+    (https://learn.microsoft.com/en-us/power-apps/developer/data-platform/reference/about-entity-reference)
+    is `IsIntersect` false, or `IsIntersect` true with more than
+    `PURE_JUNCTION_MAX_ATTRIBUTES` columns -- most intersect entities only
+    have the handful of columns needed to support the relationship and
+    carry no other data, but some (e.g. `listmember`, which also tracks
+    `entitytype`/`entityid`/audit columns) are real business data.
+    Actual read access for the remaining entities is verified later via
+    `BaseStream.check_access()`.
     """
     entity_definitions = call_entity_definitions(client)
     metadata = _request_metadata(client, path='$metadata')
@@ -110,7 +181,11 @@ def build_entity_metadata(client: Client):
 
     for entity in entity_definitions:
         entity_name = entity.get("LogicalName")
-        if entity.get("IsIntersect") or entity_name not in entity_metadata:
+        attribute_count = len(entity.get("Attributes") or [])
+        is_pure_junction_table = (
+            entity.get("IsIntersect") and attribute_count <= PURE_JUNCTION_MAX_ATTRIBUTES
+        )
+        if is_pure_junction_table or entity_name not in entity_metadata:
             continue
         entity_metadata[entity_name]["LogicalName"] = entity_name
         entity_metadata[entity_name]["EntitySetName"] = entity.get("EntitySetName")
@@ -119,6 +194,11 @@ def build_entity_metadata(client: Client):
         entity_metadata[entity_name]["Key"] = (
             entity.get("PrimaryIdAttribute") or entity_metadata[entity_name].get("Key")
         )
+        entity_metadata[entity_name]["AttributeTypes"] = {
+            attr.get("LogicalName"): _resolve_attribute_type(attr)
+            for attr in entity.get("Attributes") or []
+            if attr.get("LogicalName")
+        }
         yield entity_metadata[entity_name]
 
 def get_streams(client: Client, create_schema: bool = True) -> dict:
@@ -148,7 +228,9 @@ def get_streams(client: Client, create_schema: bool = True) -> dict:
         if not stream_name:
             continue
 
-        attributes = flatten_entity_attributes(stream.get('Properties'))
+        attributes = flatten_entity_attributes(
+            stream.get('Properties'), stream.get('AttributeTypes')
+        )
 
         if 'modifiedon' in attributes.keys():
             replication_method = 'INCREMENTAL'
@@ -203,35 +285,84 @@ def get_streams(client: Client, create_schema: bool = True) -> dict:
 
     return STREAMS
 
+def build_annotation_properties(attr_name: str, attribute_type: str) -> dict:
+    """Synthesizes the OData annotation properties Dataverse adds alongside a
+    base attribute when a request sends `Prefer: odata.include-annotations="*"`.
+
+    These annotations (a human-readable formatted value, and for lookups the
+    referenced entity's logical name and navigation property) never appear
+    as declared `$metadata` properties -- they only exist on the response
+    payload -- so they must be derived from the attribute's semantic
+    `AttributeType` rather than discovered from the CSDL document.
+    """
+    if attribute_type not in FORMATTED_VALUE_ATTRIBUTE_TYPES:
+        return {}
+
+    annotations = {
+        f'{attr_name}@OData.Community.Display.V1.FormattedValue': {
+            'type': ['null', 'string']
+        }
+    }
+
+    if attribute_type in LOOKUP_ATTRIBUTE_TYPES:
+        annotations[
+            f'{attr_name}@Microsoft.Dynamics.CRM.lookuplogicalname'
+        ] = {'type': ['null', 'string']}
+        annotations[
+            f'{attr_name}@Microsoft.Dynamics.CRM.associatednavigationproperty'
+        ] = {'type': ['null', 'string']}
+
+    return annotations
+
 def build_schema(attributes: dict):
     """Builds JSON schema for a stream based on the entity attributes and their types."""
     json_props = {}
 
     for attr_name, attr_props in attributes.items():
         dyn_type = attr_props.get('type')
-        json_type = 'string'
-        json_format = None
 
-        if dyn_type in DATE_TYPES:
-            json_format = 'date-time'
-        elif dyn_type in INTEGER_TYPES:
-            json_type = 'integer'
-        elif dyn_type in NUMBER_TYPES:
-            json_type = 'number'
-        elif dyn_type in BOOL_TYPES:
-            json_type = 'boolean'
-        elif dyn_type in COMPLEX_TYPES:
-            # TODO: mark as "inclusion": "unsupported"
+        if dyn_type in IGNORED_TYPES:
+            # Backs large blobs (e.g. entityimage, document bodies); not
+            # useful synced as base64 strings, so the property is omitted.
             continue
 
-        prop_json_schema = {
-            'type': ['null', json_type]
-        }
+        if dyn_type in MANAGED_PROPERTY_TYPES:
+            # Fixed shape per Dataverse's complex type declaration: typing
+            # each sub-property lets singer.Transformer validate/coerce
+            # them individually instead of passing an opaque blob through.
+            prop_json_schema = {
+                'type': ['null', 'object'],
+                'properties': {
+                    'Value': {'type': ['null', 'boolean']},
+                    'CanBeChanged': {'type': ['null', 'boolean']},
+                    'ManagedPropertyLogicalName': {'type': ['null', 'string']},
+                },
+                'additionalProperties': False,
+            }
+        else:
+            json_type = 'string'
+            json_format = None
 
-        if json_format:
-            prop_json_schema['format'] = json_format
+            if dyn_type in DATE_TYPES:
+                json_format = 'date-time'
+            elif dyn_type in INTEGER_TYPES:
+                json_type = 'integer'
+            elif dyn_type in NUMBER_TYPES:
+                json_type = 'number'
+            elif dyn_type in BOOL_TYPES:
+                json_type = 'boolean'
+
+            prop_json_schema = {
+                'type': ['null', json_type]
+            }
+
+            if json_format:
+                prop_json_schema['format'] = json_format
 
         json_props[attr_name] = prop_json_schema
+        json_props.update(
+            build_annotation_properties(attr_name, attr_props.get('attribute_type'))
+        )
 
     schema = {
         'type': 'object',

@@ -23,6 +23,21 @@ from tap_ms_dynamics_365_crm.exceptions import (
 
 LOGGER = get_logger()
 
+# Requesting annotations surfaces the Dataverse-computed properties
+# (formatted display values, and for lookups the referenced entity's
+# logical name/navigation property) that build_schema() synthesizes for
+# attributes with an annotation-bearing AttributeType. See
+# streams.py:FORMATTED_VALUE_ATTRIBUTE_TYPES/LOOKUP_ATTRIBUTE_TYPES.
+ANNOTATIONS_PREFER = 'odata.include-annotations="*"'
+
+# Dataverse error code for "SandboxMessageSizeExceeded": the requested page
+# of (now annotation-enlarged) records exceeded the sandboxed plug-in
+# response size limit. Halving the page size and retrying, down to a floor
+# of MIN_PAGESIZE, lets large-row entities (e.g. annotation/email) still
+# sync instead of failing outright.
+SANDBOX_MESSAGE_SIZE_EXCEEDED_CODE = '0x8004029b'
+MIN_PAGESIZE = 1
+
 
 class BaseStream(ABC):
     """
@@ -99,17 +114,73 @@ class BaseStream(ABC):
         """
 
 
+    def build_prefer_header(self) -> str:
+        """Builds the `Prefer` header value for a records request: requests
+        annotations (needed for the display-value/lookup-name properties
+        build_schema() adds to the schema) alongside the current page size.
+        """
+        return f'{ANNOTATIONS_PREFER},odata.maxpagesize={self.page_size}'
+
+    def _request_with_pagesize_halving(self, endpoint: str, allow_resize: bool = True) -> Dict:
+        """Performs a single records request, halving `page_size` and
+        retrying in place (same endpoint/params) if Dataverse rejects the
+        page for exceeding the sandboxed response size limit.
+
+        `allow_resize` must be False once pagination has followed an
+        `@odata.nextLink`: per Dataverse's paging contract, the page size
+        used for the initial request must be retained for every subsequent
+        page, so a size error on a continuation request is propagated
+        instead of being retried with a smaller page size.
+        """
+        # Each retry halves page_size, so the number of possible attempts is
+        # bounded by how many times page_size can be halved before reaching
+        # MIN_PAGESIZE (just the one attempt when resizing isn't allowed).
+        max_attempts = 1
+        size = self.page_size
+        if allow_resize:
+            while size > MIN_PAGESIZE:
+                size = max(size // 2, MIN_PAGESIZE)
+                max_attempts += 1
+
+        for attempt in range(max_attempts):
+            try:
+                return self.client.make_request(
+                    self.http_method, endpoint, headers=self.headers, params=self.params
+                )
+            except MSDynamics365CrmBadRequestError as exc:
+                if (
+                    not allow_resize
+                    or SANDBOX_MESSAGE_SIZE_EXCEEDED_CODE not in str(exc).lower()
+                    or attempt == max_attempts - 1
+                ):
+                    raise
+                self.page_size = max(self.page_size // 2, MIN_PAGESIZE)
+                LOGGER.warning(
+                    "Stream: %s hit SandboxMessageSizeExceeded (%s): %s; "
+                    "halving page size to %d and retrying.",
+                    self.tap_stream_id,
+                    SANDBOX_MESSAGE_SIZE_EXCEEDED_CODE,
+                    str(exc),
+                    self.page_size,
+                )
+                self.update_header(Prefer=self.build_prefer_header())
+
     def get_records(self) -> Iterator:
         """Interacts with api client interaction and pagination."""
         next_page = True
         endpoint = self.url_endpoint
+        # Page-size halving is only safe for the initial request; once an
+        # @odata.nextLink has been followed, Dataverse requires the original
+        # page size to be retained for the rest of the query.
+        is_initial_request = True
 
         while next_page:
-            response = self.client.make_request(self.http_method, endpoint, headers=self.headers, params=self.params)
+            response = self._request_with_pagesize_halving(endpoint, allow_resize=is_initial_request)
 
             if '@odata.nextLink' in response:
                 endpoint = response.get('@odata.nextLink')
                 self.params = {}
+                is_initial_request = False
             else:
                 next_page = False
 
@@ -354,7 +425,7 @@ class IncrementalStream(BaseStream):
             filter_value=bookmark_date,
             secondary_orderby_key=secondary_orderby_key
         )
-        self.update_header(Prefer=f'odata.maxpagesize={self.page_size}')
+        self.update_header(Prefer=self.build_prefer_header())
         self.url_endpoint = self.get_url_endpoint(parent_obj)
 
         with metrics.record_counter(self.tap_stream_id) as counter:
@@ -394,7 +465,7 @@ class FullTableStream(BaseStream):
     ) -> Dict:
         """Abstract implementation for `type: Fulltable` stream."""
         self.url_endpoint = self.get_url_endpoint(parent_obj)
-        self.update_header(Prefer=f'odata.maxpagesize={self.page_size}')
+        self.update_header(Prefer=self.build_prefer_header())
 
         with metrics.record_counter(self.tap_stream_id) as counter:
             for record in self.get_records():

@@ -1,3 +1,4 @@
+import re
 from xml.etree import ElementTree as ET
 
 NS = {
@@ -5,14 +6,41 @@ NS = {
     "edm": "http://docs.oasis-open.org/odata/ns/edm"
 }
 
-def flatten_entity_attributes(attributes: list) -> dict:
+# Lookup-style attributes (Lookup/Customer/Owner/PartyList) are exposed in
+# `$metadata` CSDL as a scalar `_<name>_value` property, but their semantic
+# `AttributeType` is only known from `EntityDefinitions(...)/Attributes` under
+# the *unprefixed* logical name (e.g. `parentcustomerid`, not
+# `_parentcustomerid_value`). This pattern recovers the base attribute name so
+# the two can be correlated.
+LOOKUP_VALUE_NAME_PATTERN = re.compile(r'^_(?P<base_name>.+)_value$')
+
+def flatten_entity_attributes(attributes: list, attribute_types: dict = None) -> dict:
+    """Flattens `$metadata` CSDL properties into a dict keyed by logical name.
+
+    `attribute_types` (logical name -> Dataverse `AttributeType`, e.g.
+    'Picklist', 'Lookup') is optional and sourced separately from
+    `EntityDefinitions(...)/Attributes`; when provided, it is merged in as
+    `attribute_type` so callers can tell a plain scalar apart from a lookup
+    or option set that shares the same underlying Edm type.
+    """
+    attribute_types = attribute_types or {}
     flat_attributes = {}
 
     for attr in attributes:
         logical_name = attr.get('LogicalName')
         dynamics_type = attr.get('PropertyType')
 
-        flat_attributes.update({logical_name: {'type': dynamics_type}})
+        flat_attr = {'type': dynamics_type}
+
+        attribute_type = attribute_types.get(logical_name)
+        if attribute_type is None:
+            lookup_match = LOOKUP_VALUE_NAME_PATTERN.match(logical_name or '')
+            if lookup_match:
+                attribute_type = attribute_types.get(lookup_match.group('base_name'))
+        if attribute_type is not None:
+            flat_attr['attribute_type'] = attribute_type
+
+        flat_attributes[logical_name] = flat_attr
 
     return flat_attributes
 

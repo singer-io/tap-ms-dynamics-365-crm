@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.2
+  * `mscrm.BooleanManagedProperty` attributes are no longer omitted from the
+    schema.
+  * Discovery now only excludes pure `IsIntersect` junction entities (4 or
+    fewer columns) instead of all of them.
+  * Discovery now learns each attribute's semantic `AttributeType` and
+    requests `Prefer: odata.include-annotations="*"`.
+  * Sync requests now automatically halve `odata.maxpagesize` and retry when
+    Dataverse returns a `0x8004029b` (SandboxMessageSizeExceeded) error.
+
 ## 1.1.1
   * Virtual entities prefixed with `mserp_` are now excluded prior to table probing. [#12](https://github.com/singer-io/tap-ms-dynamics-365-crm/pull/12)
 
