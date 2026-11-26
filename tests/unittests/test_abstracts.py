@@ -568,6 +568,58 @@ class TestBaseStreamPagination(unittest.TestCase):
         self.assertEqual(stream.page_size, 100)
         mock_client.make_request.assert_called_once()
 
+    def test_get_records_stops_pagination_early_on_malformed_request_url(self):
+        """A 'Bad request. The request URL or body is invalid or
+        malformed.' error raised on a continuation request (following
+        @odata.nextLink) signals an oversized FetchXML-style paging cookie,
+        not a transient failure, so get_records() logs a warning and stops
+        pagination instead of raising -- records from earlier pages are
+        still returned."""
+        mock_client = MagicMock()
+        mock_client.max_pagesize = 5000
+        malformed_url_error = MSDynamics365CrmBadRequestError(
+            "HTTP-error-code: 400, Error: Bad request. The request URL or "
+            "body is invalid or malformed."
+        )
+        first_page_response = {
+            'value': [{'id': '1'}],
+            '@odata.nextLink': 'https://api.example.com/data?$skiptoken=abc123'
+        }
+        mock_client.make_request.side_effect = [first_page_response, malformed_url_error]
+
+        stream = ConcreteStream(client=mock_client)
+        stream.tap_stream_id = 'msdyn_solutioncomponentsummaries'
+        stream.url_endpoint = 'https://api.example.com/data'
+        stream.page_size = 100
+
+        with patch('tap_ms_dynamics_365_crm.streams.abstracts.LOGGER.warning') as warning:
+            records = list(stream.get_records())
+
+        self.assertEqual(records, [{'id': '1'}])
+        self.assertEqual(mock_client.make_request.call_count, 2)
+        warning.assert_called_once()
+        self.assertIn('msdyn_solutioncomponentsummaries', warning.call_args[0])
+
+    def test_get_records_reraises_malformed_request_url_on_initial_request(self):
+        """The same 'malformed URL' error on the *first* request (no
+        @odata.nextLink followed yet) is a real bug/config issue, not an
+        oversized paging cookie, so it must still raise."""
+        mock_client = MagicMock()
+        mock_client.max_pagesize = 5000
+        malformed_url_error = MSDynamics365CrmBadRequestError(
+            "HTTP-error-code: 400, Error: Bad request. The request URL or "
+            "body is invalid or malformed."
+        )
+        mock_client.make_request.side_effect = malformed_url_error
+
+        stream = ConcreteStream(client=mock_client)
+        stream.url_endpoint = 'https://api.example.com/data'
+        stream.page_size = 100
+
+        with self.assertRaises(MSDynamics365CrmBadRequestError):
+            list(stream.get_records())
+
+
     def test_build_prefer_header_includes_annotations_and_pagesize(self):
         """build_prefer_header() always requests annotations (needed for
         build_schema()'s synthesized display-value/lookup-name properties)

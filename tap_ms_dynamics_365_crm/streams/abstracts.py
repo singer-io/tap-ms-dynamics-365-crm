@@ -37,6 +37,16 @@ ANNOTATIONS_PREFER = 'odata.include-annotations="*"'
 # of MIN_PAGESIZE, lets large-row entities (e.g. annotation/email) still
 # sync instead of failing outright.
 SANDBOX_MESSAGE_SIZE_EXCEEDED_CODE = '0x8004029b'
+
+# Some entities (e.g. msdyn_solutioncomponentsummaries) page using a
+# FetchXML-style `pagingcookie` embedded in `$skiptoken`, which records a
+# marker per distinct sort-key boundary crossed so far and so keeps growing
+# the deeper pagination goes -- unlike SandboxMessageSizeExceeded, it never
+# shrinks, so halving the page size can't fix it. Once that cookie makes
+# the request URL too long, Dataverse rejects it with this generic (no
+# inner error code) "Bad Request", which get_records() treats as a signal
+# to stop paginating that stream early rather than crash the whole sync.
+MALFORMED_REQUEST_URL_MESSAGE = 'the request url or body is invalid or malformed'
 MIN_PAGESIZE = 1
 
 
@@ -176,7 +186,25 @@ class BaseStream(ABC):
         is_initial_request = True
 
         while next_page:
-            response = self._request_with_pagesize_halving(endpoint, allow_resize=is_initial_request)
+            try:
+                response = self._request_with_pagesize_halving(endpoint, allow_resize=is_initial_request)
+            except MSDynamics365CrmBadRequestError as exc:
+                # Only treat this as "pagination cookie grew too large" once
+                # we're following @odata.nextLink -- a malformed *initial*
+                # request indicates a real bug/config issue and must still
+                # raise rather than being silently swallowed.
+                if is_initial_request or MALFORMED_REQUEST_URL_MESSAGE not in str(exc).lower():
+                    raise
+                LOGGER.warning(
+                    "Stream: %s pagination stopped early: the accumulated "
+                    "paging cookie made the request URL too long for "
+                    "Dataverse to accept (%s). Records fetched before this "
+                    "point were still emitted; remaining pages were not "
+                    "retrieved.",
+                    self.tap_stream_id,
+                    str(exc),
+                )
+                break
 
             if '@odata.nextLink' in response:
                 endpoint = response.get('@odata.nextLink')
