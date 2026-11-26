@@ -40,14 +40,19 @@ SANDBOX_MESSAGE_SIZE_EXCEEDED_CODE = '0x8004029b'
 
 # Some entities (e.g. msdyn_solutioncomponentsummaries) page using a
 # FetchXML-style `pagingcookie` embedded in `$skiptoken`, which records a
-# marker per distinct sort-key boundary crossed so far and so keeps growing
-# the deeper pagination goes -- unlike SandboxMessageSizeExceeded, it never
-# shrinks, so halving the page size can't fix it. Once that cookie makes
-# the request URL too long, Dataverse rejects it with this generic (no
-# inner error code) "Bad Request", which get_records() treats as a signal
-# to stop paginating that stream early rather than crash the whole sync.
+# marker per distinct sort-key boundary crossed so far and so can keep
+# growing the deeper pagination goes -- unlike SandboxMessageSizeExceeded,
+# it never shrinks, so halving the page size can't reliably fix it. A
+# continuation request can start failing with this generic (no inner
+# Dataverse error code) "Bad Request" once that cookie makes the URL too
+# long for Dataverse to accept. This message alone doesn't confirm that's
+# the cause, so get_records() doesn't try to "recover" by silently ending
+# pagination early (that would report sync success while quietly dropping
+# the remaining rows, forever, on every future sync); it re-raises with an
+# enriched message instead, so the failure is visible and actionable.
 MALFORMED_REQUEST_URL_MESSAGE = 'the request url or body is invalid or malformed'
 MIN_PAGESIZE = 1
+
 
 
 class BaseStream(ABC):
@@ -189,22 +194,23 @@ class BaseStream(ABC):
             try:
                 response = self._request_with_pagesize_halving(endpoint, allow_resize=is_initial_request)
             except MSDynamics365CrmBadRequestError as exc:
-                # Only treat this as "pagination cookie grew too large" once
-                # we're following @odata.nextLink -- a malformed *initial*
-                # request indicates a real bug/config issue and must still
-                # raise rather than being silently swallowed.
-                if is_initial_request or MALFORMED_REQUEST_URL_MESSAGE not in str(exc).lower():
-                    raise
-                LOGGER.warning(
-                    "Stream: %s pagination stopped early: the accumulated "
-                    "paging cookie made the request URL too long for "
-                    "Dataverse to accept (%s). Records fetched before this "
-                    "point were still emitted; remaining pages were not "
-                    "retrieved.",
-                    self.tap_stream_id,
-                    str(exc),
-                )
-                break
+                if not is_initial_request and MALFORMED_REQUEST_URL_MESSAGE in str(exc).lower():
+                    # Likely (not confirmed) caused by an oversized
+                    # FetchXML-style paging cookie -- a Dataverse-side
+                    # pagination limitation for this entity, not something
+                    # retrying can fix. Re-raised with added context (not
+                    # swallowed) so the sync fails visibly, instead of
+                    # reporting success while silently dropping every
+                    # remaining row -- forever, on every future sync.
+                    raise MSDynamics365CrmBadRequestError(
+                        f"Stream: {self.tap_stream_id} failed while "
+                        "fetching a page beyond the first, possibly "
+                        "because Dataverse's paging cookie for this "
+                        "entity grew too large for the request URL. "
+                        f"Original error: {exc}",
+                        response=exc.response,
+                    ) from exc
+                raise
 
             if '@odata.nextLink' in response:
                 endpoint = response.get('@odata.nextLink')

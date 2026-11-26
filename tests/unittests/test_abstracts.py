@@ -568,13 +568,13 @@ class TestBaseStreamPagination(unittest.TestCase):
         self.assertEqual(stream.page_size, 100)
         mock_client.make_request.assert_called_once()
 
-    def test_get_records_stops_pagination_early_on_malformed_request_url(self):
+    def test_get_records_reraises_malformed_request_url_with_enriched_message_on_continuation(self):
         """A 'Bad request. The request URL or body is invalid or
         malformed.' error raised on a continuation request (following
-        @odata.nextLink) signals an oversized FetchXML-style paging cookie,
-        not a transient failure, so get_records() logs a warning and stops
-        pagination instead of raising -- records from earlier pages are
-        still returned."""
+        @odata.nextLink) is still propagated -- not swallowed -- since
+        silently ending pagination would report sync success while
+        quietly dropping the remaining rows on every future sync. The
+        re-raised error adds stream/context info to aid investigation."""
         mock_client = MagicMock()
         mock_client.max_pagesize = 5000
         malformed_url_error = MSDynamics365CrmBadRequestError(
@@ -592,18 +592,16 @@ class TestBaseStreamPagination(unittest.TestCase):
         stream.url_endpoint = 'https://api.example.com/data'
         stream.page_size = 100
 
-        with patch('tap_ms_dynamics_365_crm.streams.abstracts.LOGGER.warning') as warning:
-            records = list(stream.get_records())
+        with self.assertRaises(MSDynamics365CrmBadRequestError) as ctx:
+            list(stream.get_records())
 
-        self.assertEqual(records, [{'id': '1'}])
+        self.assertIn('msdyn_solutioncomponentsummaries', str(ctx.exception))
         self.assertEqual(mock_client.make_request.call_count, 2)
-        warning.assert_called_once()
-        self.assertIn('msdyn_solutioncomponentsummaries', warning.call_args[0])
 
     def test_get_records_reraises_malformed_request_url_on_initial_request(self):
         """The same 'malformed URL' error on the *first* request (no
         @odata.nextLink followed yet) is a real bug/config issue, not an
-        oversized paging cookie, so it must still raise."""
+        oversized paging cookie, so it's raised as-is (no added context)."""
         mock_client = MagicMock()
         mock_client.max_pagesize = 5000
         malformed_url_error = MSDynamics365CrmBadRequestError(
