@@ -40,6 +40,51 @@ class TestXmlTransformer(unittest.TestCase):
         self.assertEqual(result['name'], {'type': 'Edm.String'})
         self.assertEqual(result['revenue'], {'type': 'Edm.Decimal'})
 
+    def test_flatten_entity_attributes_direct_attribute_type_match(self):
+        """A direct logical-name match in attribute_types is merged in as
+        'attribute_type' alongside the CSDL-declared Edm type."""
+        attributes = [
+            {'LogicalName': 'new_priority', 'PropertyType': 'Edm.Int32'}
+        ]
+
+        result = flatten_entity_attributes(
+            attributes, {'new_priority': 'Picklist'}
+        )
+
+        self.assertEqual(result, {
+            'new_priority': {'type': 'Edm.Int32', 'attribute_type': 'Picklist'}
+        })
+
+    def test_flatten_entity_attributes_lookup_value_name_resolves_base_attribute_type(self):
+        """A CSDL `_<name>_value` lookup property is correlated back to the
+        unprefixed logical name EntityDefinitions' Attributes uses, so its
+        'Lookup' AttributeType is still discovered."""
+        attributes = [
+            {'LogicalName': '_new_parentaccountid_value', 'PropertyType': 'Edm.Guid'}
+        ]
+
+        result = flatten_entity_attributes(
+            attributes, {'new_parentaccountid': 'Lookup'}
+        )
+
+        self.assertEqual(result, {
+            '_new_parentaccountid_value': {'type': 'Edm.Guid', 'attribute_type': 'Lookup'}
+        })
+
+    def test_flatten_entity_attributes_unresolved_attribute_type_omits_key(self):
+        """When no attribute_types entry matches (directly or via the lookup
+        naming convention), 'attribute_type' is simply omitted rather than
+        set to None, preserving the plain {'type': ...} shape."""
+        attributes = [
+            {'LogicalName': 'description', 'PropertyType': 'Edm.String'}
+        ]
+
+        result = flatten_entity_attributes(
+            attributes, {'unrelated_attribute': 'Picklist'}
+        )
+
+        self.assertEqual(result, {'description': {'type': 'Edm.String'}})
+
     def test_transform_metadata_xml_simple_entity(self):
         """Test transform_metadata_xml with simple entity"""
         xml = '''<?xml version="1.0" encoding="utf-8"?>

@@ -12,6 +12,7 @@ from singer import (
     metadata
 )
 from tap_ms_dynamics_365_crm.client import Client, MAX_PAGESIZE
+from tap_ms_dynamics_365_crm.field_naming import normalize_field_name
 from tap_ms_dynamics_365_crm.exceptions import (
     MSDynamics365CrmError,
     MSDynamics365CrmAuthenticationError,
@@ -22,6 +23,36 @@ from tap_ms_dynamics_365_crm.exceptions import (
 )
 
 LOGGER = get_logger()
+
+# Requesting annotations surfaces the Dataverse-computed properties
+# (formatted display values, and for lookups the referenced entity's
+# logical name/navigation property) that build_schema() synthesizes for
+# attributes with an annotation-bearing AttributeType. See
+# streams.py:FORMATTED_VALUE_ATTRIBUTE_TYPES/LOOKUP_ATTRIBUTE_TYPES.
+ANNOTATIONS_PREFER = 'odata.include-annotations="*"'
+
+# Dataverse error code for "SandboxMessageSizeExceeded": the requested page
+# of (now annotation-enlarged) records exceeded the sandboxed plug-in
+# response size limit. Halving the page size and retrying, down to a floor
+# of MIN_PAGESIZE, lets large-row entities (e.g. annotation/email) still
+# sync instead of failing outright.
+SANDBOX_MESSAGE_SIZE_EXCEEDED_CODE = '0x8004029b'
+
+# Some entities (e.g. msdyn_solutioncomponentsummaries) page using a
+# FetchXML-style `pagingcookie` embedded in `$skiptoken`, which records a
+# marker per distinct sort-key boundary crossed so far and so can keep
+# growing the deeper pagination goes -- unlike SandboxMessageSizeExceeded,
+# it never shrinks, so halving the page size can't reliably fix it. A
+# continuation request can start failing with this generic (no inner
+# Dataverse error code) "Bad Request" once that cookie makes the URL too
+# long for Dataverse to accept. This message alone doesn't confirm that's
+# the cause, so get_records() doesn't try to "recover" by silently ending
+# pagination early (that would report sync success while quietly dropping
+# the remaining rows, forever, on every future sync); it re-raises with an
+# enriched message instead, so the failure is visible and actionable.
+MALFORMED_REQUEST_URL_MESSAGE = 'the request url or body is invalid or malformed'
+MIN_PAGESIZE = 1
+
 
 
 class BaseStream(ABC):
@@ -99,21 +130,101 @@ class BaseStream(ABC):
         """
 
 
+    def build_prefer_header(self) -> str:
+        """Builds the `Prefer` header value for a records request: requests
+        annotations (needed for the display-value/lookup-name properties
+        build_schema() adds to the schema) alongside the current page size.
+        """
+        return f'{ANNOTATIONS_PREFER},odata.maxpagesize={self.page_size}'
+
+    def _request_with_pagesize_halving(self, endpoint: str, allow_resize: bool = True) -> Dict:
+        """Performs a single records request, halving `page_size` and
+        retrying in place (same endpoint/params) if Dataverse rejects the
+        page for exceeding the sandboxed response size limit.
+
+        `allow_resize` must be False once pagination has followed an
+        `@odata.nextLink`: per Dataverse's paging contract, the page size
+        used for the initial request must be retained for every subsequent
+        page, so a size error on a continuation request is propagated
+        instead of being retried with a smaller page size.
+        """
+        # Each retry halves page_size, so the number of possible attempts is
+        # bounded by how many times page_size can be halved before reaching
+        # MIN_PAGESIZE (just the one attempt when resizing isn't allowed).
+        max_attempts = 1
+        size = self.page_size
+        if allow_resize:
+            while size > MIN_PAGESIZE:
+                size = max(size // 2, MIN_PAGESIZE)
+                max_attempts += 1
+
+        for attempt in range(max_attempts):
+            try:
+                return self.client.make_request(
+                    self.http_method, endpoint, headers=self.headers, params=self.params
+                )
+            except MSDynamics365CrmBadRequestError as exc:
+                if (
+                    not allow_resize
+                    or SANDBOX_MESSAGE_SIZE_EXCEEDED_CODE not in str(exc).lower()
+                    or attempt == max_attempts - 1
+                ):
+                    raise
+                self.page_size = max(self.page_size // 2, MIN_PAGESIZE)
+                LOGGER.warning(
+                    "Stream: %s hit SandboxMessageSizeExceeded (%s): %s; "
+                    "halving page size to %d and retrying.",
+                    self.tap_stream_id,
+                    SANDBOX_MESSAGE_SIZE_EXCEEDED_CODE,
+                    str(exc),
+                    self.page_size,
+                )
+                self.update_header(Prefer=self.build_prefer_header())
+
     def get_records(self) -> Iterator:
         """Interacts with api client interaction and pagination."""
         next_page = True
         endpoint = self.url_endpoint
+        # Page-size halving is only safe for the initial request; once an
+        # @odata.nextLink has been followed, Dataverse requires the original
+        # page size to be retained for the rest of the query.
+        is_initial_request = True
 
         while next_page:
-            response = self.client.make_request(self.http_method, endpoint, headers=self.headers, params=self.params)
+            try:
+                response = self._request_with_pagesize_halving(endpoint, allow_resize=is_initial_request)
+            except MSDynamics365CrmBadRequestError as exc:
+                if not is_initial_request and MALFORMED_REQUEST_URL_MESSAGE in str(exc).lower():
+                    # Likely (not confirmed) caused by an oversized
+                    # FetchXML-style paging cookie -- a Dataverse-side
+                    # pagination limitation for this entity, not something
+                    # retrying can fix. Re-raised with added context (not
+                    # swallowed) so the sync fails visibly, instead of
+                    # reporting success while silently dropping every
+                    # remaining row -- forever, on every future sync.
+                    raise MSDynamics365CrmBadRequestError(
+                        f"Stream: {self.tap_stream_id} failed while "
+                        "fetching a page beyond the first, possibly "
+                        "because Dataverse's paging cookie for this "
+                        "entity grew too large for the request URL. "
+                        f"Original error: {exc}",
+                        response=exc.response,
+                    ) from exc
+                raise
 
             if '@odata.nextLink' in response:
                 endpoint = response.get('@odata.nextLink')
                 self.params = {}
+                is_initial_request = False
             else:
                 next_page = False
 
-            yield from response.get(self.data_key, [])
+            # Normalizing keys here (once, for every stream type) keeps raw
+            # API record keys in lockstep with the normalized schema property
+            # names streams.py:build_schema()/build_annotation_properties()
+            # generate.
+            for record in response.get(self.data_key, []):
+                yield {normalize_field_name(key): value for key, value in record.items()}
 
     def write_schema(self) -> None:
         """
@@ -354,7 +465,7 @@ class IncrementalStream(BaseStream):
             filter_value=bookmark_date,
             secondary_orderby_key=secondary_orderby_key
         )
-        self.update_header(Prefer=f'odata.maxpagesize={self.page_size}')
+        self.update_header(Prefer=self.build_prefer_header())
         self.url_endpoint = self.get_url_endpoint(parent_obj)
 
         with metrics.record_counter(self.tap_stream_id) as counter:
@@ -394,7 +505,7 @@ class FullTableStream(BaseStream):
     ) -> Dict:
         """Abstract implementation for `type: Fulltable` stream."""
         self.url_endpoint = self.get_url_endpoint(parent_obj)
-        self.update_header(Prefer=f'odata.maxpagesize={self.page_size}')
+        self.update_header(Prefer=self.build_prefer_header())
 
         with metrics.record_counter(self.tap_stream_id) as counter:
             for record in self.get_records():

@@ -406,6 +406,39 @@ class TestBaseStreamPagination(unittest.TestCase):
         records = list(stream.get_records())
         self.assertEqual(len(records), 2)
 
+    def test_get_records_normalizes_annotation_keys_and_preserves_base_lookup_prefix(self):
+        """get_records() must normalize raw Dataverse `@...` annotation
+        keys (lowercased/underscored suffix, leading `_` stripped, since
+        they're new fields) so they match the normalized schema property
+        names build_schema() generates, while leaving the base lookup
+        `_value` attribute's prefix untouched (an existing field that may
+        already be selected)."""
+        mock_client = MagicMock()
+        mock_client.max_pagesize = 5000
+        response = {
+            'value': [{
+                '_ownerid_value': 'guid-1',
+                '_ownerid_value@OData.Community.Display.V1.FormattedValue': 'Jane Doe',
+                '_ownerid_value@Microsoft.Dynamics.CRM.lookuplogicalname': 'systemuser',
+                'territorycode': 1,
+                'territorycode@OData.Community.Display.V1.FormattedValue': 'Northeast',
+            }]
+        }
+        mock_client.make_request.return_value = response
+        stream = ConcreteStream(client=mock_client)
+        stream.url_endpoint = 'https://api.example.com/data'
+        stream.data_key = 'value'
+
+        records = list(stream.get_records())
+
+        self.assertEqual(records, [{
+            '_ownerid_value': 'guid-1',
+            'ownerid_value_odata_community_display_v1_formatted_value': 'Jane Doe',
+            'ownerid_value_microsoft_dynamics_crm_lookuplogicalname': 'systemuser',
+            'territorycode': 1,
+            'territorycode_odata_community_display_v1_formatted_value': 'Northeast',
+        }])
+
     def test_get_records_missing_data_key(self):
         """Test get_records when data_key is missing from response"""
         mock_client = MagicMock()
@@ -437,6 +470,166 @@ class TestBaseStreamPagination(unittest.TestCase):
             'Accept': 'application/json',
             'Prefer': 'odata.maxpagesize=100'
         })
+
+    def test_get_records_halves_pagesize_and_retries_on_sandbox_message_size_exceeded(self):
+        """A 0x8004029b (SandboxMessageSizeExceeded) error retries the same
+        request with a halved page size and an updated Prefer header,
+        instead of failing the sync."""
+        mock_client = MagicMock()
+        mock_client.max_pagesize = 5000
+        sandbox_error = MSDynamics365CrmBadRequestError(
+            "HTTP-error-code: 400, Error Code: 0x8004029b, "
+            "Error: SandboxMessageSizeExceeded"
+        )
+        mock_client.make_request.side_effect = [
+            sandbox_error,
+            {'value': [{'id': '1'}]},
+        ]
+
+        stream = ConcreteStream(client=mock_client)
+        stream.tap_stream_id = 'annotation'
+        stream.url_endpoint = 'https://api.example.com/data'
+        stream.page_size = 100
+        stream.headers = {'Accept': 'application/json'}
+
+        records = list(stream.get_records())
+
+        self.assertEqual(records, [{'id': '1'}])
+        self.assertEqual(stream.page_size, 50)
+        self.assertEqual(mock_client.make_request.call_count, 2)
+        retried_headers = mock_client.make_request.call_args_list[1][1]['headers']
+        self.assertIn('odata.maxpagesize=50', retried_headers['Prefer'])
+
+    def test_get_records_reraises_sandbox_error_once_pagesize_floor_reached(self):
+        """Once page_size can no longer be halved, a persisting
+        SandboxMessageSizeExceeded error is raised rather than retried
+        forever."""
+        mock_client = MagicMock()
+        mock_client.max_pagesize = 5000
+        sandbox_error = MSDynamics365CrmBadRequestError(
+            "HTTP-error-code: 400, Error Code: 0x8004029b, "
+            "Error: SandboxMessageSizeExceeded"
+        )
+        mock_client.make_request.side_effect = sandbox_error
+
+        stream = ConcreteStream(client=mock_client)
+        stream.url_endpoint = 'https://api.example.com/data'
+        stream.page_size = 1
+
+        with self.assertRaises(MSDynamics365CrmBadRequestError):
+            list(stream.get_records())
+
+        self.assertEqual(stream.page_size, 1)
+
+    def test_get_records_reraises_sandbox_error_on_continuation_request(self):
+        """A SandboxMessageSizeExceeded error raised on a request that
+        followed an @odata.nextLink must be re-raised, not retried with a
+        halved page size: Dataverse requires the original page size to be
+        retained for the lifetime of the paged query."""
+        mock_client = MagicMock()
+        mock_client.max_pagesize = 5000
+        sandbox_error = MSDynamics365CrmBadRequestError(
+            "HTTP-error-code: 400, Error Code: 0x8004029b, "
+            "Error: SandboxMessageSizeExceeded"
+        )
+        first_page_response = {
+            'value': [{'id': '1'}],
+            '@odata.nextLink': 'https://api.example.com/data?$skiptoken=abc123'
+        }
+        mock_client.make_request.side_effect = [first_page_response, sandbox_error]
+
+        stream = ConcreteStream(client=mock_client)
+        stream.url_endpoint = 'https://api.example.com/data'
+        stream.page_size = 100
+
+        with self.assertRaises(MSDynamics365CrmBadRequestError):
+            list(stream.get_records())
+
+        self.assertEqual(stream.page_size, 100)
+        self.assertEqual(mock_client.make_request.call_count, 2)
+
+    def test_get_records_reraises_unrelated_bad_request_errors(self):
+        """Bad request errors that aren't SandboxMessageSizeExceeded are
+        never retried/halved; they propagate immediately."""
+        mock_client = MagicMock()
+        mock_client.max_pagesize = 5000
+        other_error = MSDynamics365CrmBadRequestError(
+            "HTTP-error-code: 400, Error Code: 0x80040216, Error: Something else"
+        )
+        mock_client.make_request.side_effect = other_error
+
+        stream = ConcreteStream(client=mock_client)
+        stream.url_endpoint = 'https://api.example.com/data'
+        stream.page_size = 100
+
+        with self.assertRaises(MSDynamics365CrmBadRequestError):
+            list(stream.get_records())
+
+        self.assertEqual(stream.page_size, 100)
+        mock_client.make_request.assert_called_once()
+
+    def test_get_records_reraises_malformed_request_url_with_enriched_message_on_continuation(self):
+        """A 'Bad request. The request URL or body is invalid or
+        malformed.' error raised on a continuation request (following
+        @odata.nextLink) is still propagated -- not swallowed -- since
+        silently ending pagination would report sync success while
+        quietly dropping the remaining rows on every future sync. The
+        re-raised error adds stream/context info to aid investigation."""
+        mock_client = MagicMock()
+        mock_client.max_pagesize = 5000
+        malformed_url_error = MSDynamics365CrmBadRequestError(
+            "HTTP-error-code: 400, Error: Bad request. The request URL or "
+            "body is invalid or malformed."
+        )
+        first_page_response = {
+            'value': [{'id': '1'}],
+            '@odata.nextLink': 'https://api.example.com/data?$skiptoken=abc123'
+        }
+        mock_client.make_request.side_effect = [first_page_response, malformed_url_error]
+
+        stream = ConcreteStream(client=mock_client)
+        stream.tap_stream_id = 'msdyn_solutioncomponentsummaries'
+        stream.url_endpoint = 'https://api.example.com/data'
+        stream.page_size = 100
+
+        with self.assertRaises(MSDynamics365CrmBadRequestError) as ctx:
+            list(stream.get_records())
+
+        self.assertIn('msdyn_solutioncomponentsummaries', str(ctx.exception))
+        self.assertEqual(mock_client.make_request.call_count, 2)
+
+    def test_get_records_reraises_malformed_request_url_on_initial_request(self):
+        """The same 'malformed URL' error on the *first* request (no
+        @odata.nextLink followed yet) is a real bug/config issue, not an
+        oversized paging cookie, so it's raised as-is (no added context)."""
+        mock_client = MagicMock()
+        mock_client.max_pagesize = 5000
+        malformed_url_error = MSDynamics365CrmBadRequestError(
+            "HTTP-error-code: 400, Error: Bad request. The request URL or "
+            "body is invalid or malformed."
+        )
+        mock_client.make_request.side_effect = malformed_url_error
+
+        stream = ConcreteStream(client=mock_client)
+        stream.url_endpoint = 'https://api.example.com/data'
+        stream.page_size = 100
+
+        with self.assertRaises(MSDynamics365CrmBadRequestError):
+            list(stream.get_records())
+
+
+    def test_build_prefer_header_includes_annotations_and_pagesize(self):
+        """build_prefer_header() always requests annotations (needed for
+        build_schema()'s synthesized display-value/lookup-name properties)
+        alongside the current page size."""
+        mock_client = MagicMock()
+        mock_client.max_pagesize = 5000
+        stream = ConcreteStream(client=mock_client)
+        stream.page_size = 250
+
+        prefer = stream.build_prefer_header()
+
+        self.assertEqual(prefer, 'odata.include-annotations="*",odata.maxpagesize=250')
 
 
 class TestBaseStreamHelperMethods(unittest.TestCase):

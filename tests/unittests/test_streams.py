@@ -1,6 +1,8 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
+from singer import Transformer
+
 from tap_ms_dynamics_365_crm.streams.streams import (
     get_streams,
     call_entity_definitions,
@@ -330,6 +332,7 @@ class TestCallEntityDefinitions(unittest.TestCase):
                     "MetadataId,LogicalName,EntitySetName,IsIntersect,"
                     "PrimaryIdAttribute"
                 ),
+                "$expand": "Attributes($select=LogicalName,AttributeType,AttributeTypeName)",
                 "$count": "true",
             },
             path='EntityDefinitions',
@@ -380,12 +383,13 @@ class TestBuildEntityMetadata(unittest.TestCase):
 
     @patch('tap_ms_dynamics_365_crm.streams.streams.transform_metadata_xml')
     @patch('tap_ms_dynamics_365_crm.streams.streams.call_entity_definitions')
-    def test_yields_entities_present_in_metadata_excluding_intersect(
+    def test_yields_entities_present_in_metadata_excluding_pure_junction_tables(
         self, mock_call_entity_definitions, mock_transform_metadata_xml
     ):
         """Every entity returned by EntityDefinitions and found in $metadata is
-        yielded, regardless of custom/managed status, except IsIntersect
-        (N:N relationship/junction) entities."""
+        yielded, regardless of custom/managed status, except pure N:N
+        junction entities (IsIntersect with at most
+        PURE_JUNCTION_MAX_ATTRIBUTES columns)."""
         mock_call_entity_definitions.return_value = [
             {"LogicalName": "new_customentity", "IsIntersect": False,
              "EntitySetName": "new_customentities"},
@@ -394,7 +398,8 @@ class TestBuildEntityMetadata(unittest.TestCase):
             {"LogicalName": "not_in_metadata", "IsIntersect": False,
              "EntitySetName": "not_in_metadatas"},
             {"LogicalName": "contact_relationship", "IsIntersect": True,
-             "EntitySetName": "contact_relationshipset"},
+             "EntitySetName": "contact_relationshipset",
+             "Attributes": [{"LogicalName": "contactid"}, {"LogicalName": "relatedcontactid"}]},
         ]
         mock_transform_metadata_xml.return_value = {
             "new_customentity": {},
@@ -411,6 +416,34 @@ class TestBuildEntityMetadata(unittest.TestCase):
         self.assertIn("account", result_names)
         self.assertNotIn("not_in_metadata", result_names)
         self.assertNotIn("contact_relationship", result_names)
+
+    @patch('tap_ms_dynamics_365_crm.streams.streams.transform_metadata_xml')
+    @patch('tap_ms_dynamics_365_crm.streams.streams.call_entity_definitions')
+    def test_yields_intersect_entity_with_more_than_four_columns(
+        self, mock_call_entity_definitions, mock_transform_metadata_xml
+    ):
+        """An IsIntersect entity with more than PURE_JUNCTION_MAX_ATTRIBUTES
+        columns (e.g. `listmember`, which also carries entitytype/entityid
+        and audit columns) is real business data, not a throwaway junction
+        table, so it must still be yielded."""
+        mock_call_entity_definitions.return_value = [
+            {"LogicalName": "listmember", "IsIntersect": True,
+             "EntitySetName": "listmembers",
+             "Attributes": [
+                 {"LogicalName": "listmemberid"},
+                 {"LogicalName": "listid"},
+                 {"LogicalName": "entityid"},
+                 {"LogicalName": "entitytype"},
+                 {"LogicalName": "createdon"},
+             ]},
+        ]
+        mock_transform_metadata_xml.return_value = {"listmember": {}}
+
+        client = MagicMock()
+
+        results = list(build_entity_metadata(client))
+
+        self.assertEqual([r["LogicalName"] for r in results], ["listmember"])
 
     @patch('tap_ms_dynamics_365_crm.streams.streams.transform_metadata_xml')
     @patch('tap_ms_dynamics_365_crm.streams.streams.call_entity_definitions')
@@ -453,6 +486,102 @@ class TestBuildEntityMetadata(unittest.TestCase):
         results = list(build_entity_metadata(client))
 
         self.assertEqual(results[0]["Key"], "accountid")
+
+    @patch('tap_ms_dynamics_365_crm.streams.streams.transform_metadata_xml')
+    @patch('tap_ms_dynamics_365_crm.streams.streams.call_entity_definitions')
+    def test_propagates_attribute_types_from_expanded_attributes(
+        self, mock_call_entity_definitions, mock_transform_metadata_xml
+    ):
+        """The expanded `Attributes` collection from EntityDefinitions is
+        flattened into an AttributeTypes map keyed by logical name, so
+        build_schema() can later tell a Picklist/Lookup apart from a plain
+        scalar sharing the same Edm.* type."""
+        mock_call_entity_definitions.return_value = [
+            {
+                "LogicalName": "account", "EntitySetName": "accounts",
+                "Attributes": [
+                    {"LogicalName": "new_priority", "AttributeType": "Picklist"},
+                    {"LogicalName": "parentaccountid", "AttributeType": "Lookup"},
+                ],
+            },
+        ]
+        mock_transform_metadata_xml.return_value = {"account": {"Key": "accountid"}}
+
+        client = MagicMock()
+
+        results = list(build_entity_metadata(client))
+
+        self.assertEqual(results[0]["AttributeTypes"], {
+            "new_priority": "Picklist",
+            "parentaccountid": "Lookup",
+        })
+
+    @patch('tap_ms_dynamics_365_crm.streams.streams.transform_metadata_xml')
+    @patch('tap_ms_dynamics_365_crm.streams.streams.call_entity_definitions')
+    def test_resolves_multiselect_picklist_reported_as_virtual_attribute_type(
+        self, mock_call_entity_definitions, mock_transform_metadata_xml
+    ):
+        """Dataverse reports multi-select choice columns with
+        `AttributeType: "Virtual"` rather than `"MultiSelectPicklist"` (see
+        https://learn.microsoft.com/en-us/power-apps/developer/data-platform/entity-attribute-metadata).
+        build_entity_metadata() must resolve the real type via
+        `AttributeTypeName.Value` so these columns still match
+        FORMATTED_VALUE_ATTRIBUTE_TYPES and get their formatted-value
+        annotation during discovery, using the actual nested shape Dataverse
+        returns for AttributeTypeName."""
+        mock_call_entity_definitions.return_value = [
+            {
+                "LogicalName": "account", "EntitySetName": "accounts",
+                "Attributes": [
+                    {
+                        "LogicalName": "preferredcontactmethods",
+                        "AttributeType": "Virtual",
+                        "AttributeTypeName": {"Value": "MultiSelectPicklistType"},
+                    },
+                    {
+                        "LogicalName": "entityimage",
+                        "AttributeType": "Virtual",
+                        "AttributeTypeName": {"Value": "ImageType"},
+                    },
+                    {
+                        "LogicalName": "new_priority",
+                        "AttributeType": "Picklist",
+                        "AttributeTypeName": {"Value": "PicklistType"},
+                    },
+                ],
+            },
+        ]
+        mock_transform_metadata_xml.return_value = {"account": {"Key": "accountid"}}
+
+        client = MagicMock()
+
+        results = list(build_entity_metadata(client))
+
+        self.assertEqual(results[0]["AttributeTypes"], {
+            "preferredcontactmethods": "MultiSelectPicklist",
+            "entityimage": "Virtual",
+            "new_priority": "Picklist",
+        })
+
+    @patch('tap_ms_dynamics_365_crm.streams.streams.transform_metadata_xml')
+    @patch('tap_ms_dynamics_365_crm.streams.streams.call_entity_definitions')
+    def test_missing_attributes_collection_yields_empty_attribute_types(
+        self, mock_call_entity_definitions, mock_transform_metadata_xml
+    ):
+        """Entities without an `Attributes` key (e.g. in older/mocked
+        responses) still yield an (empty) AttributeTypes map instead of
+        raising."""
+        mock_call_entity_definitions.return_value = [
+            {"LogicalName": "account", "EntitySetName": "accounts"},
+        ]
+        mock_transform_metadata_xml.return_value = {"account": {"Key": "accountid"}}
+
+        client = MagicMock()
+
+        results = list(build_entity_metadata(client))
+
+        self.assertEqual(results[0]["AttributeTypes"], {})
+
 
 
 class TestGetStreamsInheritedReplicationKey(unittest.TestCase):
@@ -517,7 +646,7 @@ class TestBuildSchema(unittest.TestCase):
         schema = build_schema({'is_active': {'type': 'Edm.Boolean'}})
         self.assertEqual(schema['properties']['is_active']['type'], ['null', 'boolean'])
 
-    def test_skips_complex_type(self):
+    def test_skips_edm_binary_type(self):
         schema = build_schema({'blob': {'type': 'Edm.Binary'}})
         self.assertNotIn('blob', schema['properties'])
 
@@ -525,3 +654,125 @@ class TestBuildSchema(unittest.TestCase):
         schema = build_schema({'modifiedon': {'type': 'Edm.DateTimeOffset'}})
         self.assertEqual(schema['properties']['modifiedon']['type'], ['null', 'string'])
         self.assertEqual(schema['properties']['modifiedon']['format'], 'date-time')
+
+    def test_lookup_attribute_type_adds_formatted_value_and_lookup_annotations(self):
+        """A `_<name>_value` property whose resolved AttributeType is 'Lookup'
+        gets the formatted display value plus the two lookup-identification
+        annotations Dataverse emits under `odata.include-annotations="*"`.
+        The base property keeps its leading `_` (an existing field that may
+        already be selected); its annotations -- new fields no existing
+        customer could already have selected -- get both the leading `_`
+        stripped and the `@...` suffix lowercased/underscored."""
+        schema = build_schema({
+            '_parentcustomerid_value': {'type': 'Edm.Guid', 'attribute_type': 'Lookup'}
+        })
+
+        properties = schema['properties']
+        self.assertIn('_parentcustomerid_value', properties)
+        self.assertEqual(
+            properties['parentcustomerid_value_odata_community_display_v1_formatted_value']['type'],
+            ['null', 'string'],
+        )
+        self.assertEqual(
+            properties['parentcustomerid_value_microsoft_dynamics_crm_lookuplogicalname']['type'],
+            ['null', 'string'],
+        )
+        self.assertEqual(
+            properties[
+                'parentcustomerid_value_microsoft_dynamics_crm_associatednavigationproperty'
+            ]['type'],
+            ['null', 'string'],
+        )
+
+
+    def test_picklist_attribute_type_adds_only_formatted_value_annotation(self):
+        """A Picklist (single-select option set) only gets the label
+        annotation, not the lookup-identification ones."""
+        schema = build_schema({
+            'new_priority': {'type': 'Edm.Int32', 'attribute_type': 'Picklist'}
+        })
+
+        properties = schema['properties']
+        self.assertIn('new_priority_odata_community_display_v1_formatted_value', properties)
+        self.assertNotIn('new_priority_microsoft_dynamics_crm_lookuplogicalname', properties)
+        self.assertNotIn(
+            'new_priority_microsoft_dynamics_crm_associatednavigationproperty', properties
+        )
+
+    def test_attribute_without_annotation_bearing_type_adds_no_annotations(self):
+        """A plain Edm.Int32 whole-number attribute (no resolvable
+        AttributeType, or one outside the known annotation-bearing set)
+        gets no synthesized annotation properties."""
+        schema = build_schema({'numberofemployees': {'type': 'Edm.Int32'}})
+
+        self.assertEqual(list(schema['properties'].keys()), ['numberofemployees'])
+
+    def test_edm_binary_skip_also_skips_its_annotations(self):
+        """A skipped Edm.Binary field never reaches the annotation step,
+        even if it happened to carry an attribute_type."""
+        schema = build_schema({
+            'blob': {'type': 'Edm.Binary', 'attribute_type': 'Picklist'}
+        })
+
+        self.assertEqual(schema['properties'], {})
+
+    def test_managed_property_type_gets_strict_nested_object_schema(self):
+        """`mscrm.BooleanManagedProperty` (e.g. `isdisabled`) is a fixed
+        Dataverse complex type ({"Value": bool, "CanBeChanged": bool,
+        "ManagedPropertyLogicalName": str}), so it gets a strictly-typed
+        nested object schema instead of being omitted like Edm.Binary."""
+        schema = build_schema({
+            'isdisabled': {'type': 'mscrm.BooleanManagedProperty'}
+        })
+
+        self.assertEqual(
+            schema['properties']['isdisabled'],
+            {
+                'type': ['null', 'object'],
+                'properties': {
+                    'Value': {'type': ['null', 'boolean']},
+                    'CanBeChanged': {'type': ['null', 'boolean']},
+                    'ManagedPropertyLogicalName': {'type': ['null', 'string']},
+                },
+                'additionalProperties': False,
+            },
+        )
+
+    def test_managed_property_type_still_adds_its_formatted_value_annotation(self):
+        """The strict nested schema doesn't prevent the usual annotation
+        synthesis: a managed-property attribute whose resolved
+        AttributeType is 'Boolean' still gets the formatted-value
+        annotation other Boolean attributes get."""
+        schema = build_schema({
+            'isdisabled': {'type': 'mscrm.BooleanManagedProperty', 'attribute_type': 'Boolean'}
+        })
+
+        self.assertIn(
+            'isdisabled_odata_community_display_v1_formatted_value', schema['properties']
+        )
+
+    def test_managed_property_schema_validates_and_coerces_via_singer_transform(self):
+        """Confirms the generated strict schema actually behaves as
+        intended against singer.Transformer: each declared sub-property is
+        validated/coerced individually, an undeclared sub-property is
+        dropped, and a null value is also accepted."""
+        schema = build_schema({'isdisabled': {'type': 'mscrm.BooleanManagedProperty'}})
+        raw_value = {
+            'Value': True,
+            'CanBeChanged': True,
+            'ManagedPropertyLogicalName': 'booleanmanagedproperty',
+            'UnexpectedExtraKey': 'should be dropped',
+        }
+
+        with Transformer() as transformer:
+            transformed = transformer.transform({'isdisabled': raw_value}, schema)
+            self.assertEqual(transformed['isdisabled'], {
+                'Value': True,
+                'CanBeChanged': True,
+                'ManagedPropertyLogicalName': 'booleanmanagedproperty',
+            })
+
+            transformed_null = transformer.transform({'isdisabled': None}, schema)
+            self.assertIsNone(transformed_null['isdisabled'])
+
+
